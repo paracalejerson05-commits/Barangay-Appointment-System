@@ -1,0 +1,137 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: {userId}
+    // Fields:
+    //   - uid: string (required)
+    //   - email: string (required, email format)
+    //   - displayName: string (optional)
+    //   - role: string (required, 'resident' or 'admin')
+    //   - createdAt: timestamp (required)
+    //
+    // Collection: serviceRequests
+    // Document ID: {requestId}
+    // Fields:
+    //   - residentUid: string (required)
+    //   - residentName: string (required)
+    //   - age: string or number (required)
+    //   - civilStatus: string (required)
+    //   - serviceType: string (required)
+    //   - status: string (required, 'pending', 'approved', 'disapproved')
+    //   - description: string (optional)
+    //   - appointmentDate: timestamp (optional)
+    //   - aiRecommendation: string (optional)
+    //   - adminNotes: string (optional)
+    //   - createdAt: timestamp (required)
+    //   - updatedAt: timestamp (required)
+    //
+    // Collection: notifications
+    // Document ID: {notificationId}
+    // Fields:
+    //   - userId: string (required)
+    //   - message: string (required)
+    //   - type: string (optional)
+    //   - read: bool (required)
+    //   - createdAt: timestamp (required)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.email == "paracalejerson05@gmail.com" ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
+      );
+    }
+
+    function isRecent(time) {
+      return time > request.time - duration.value(5, 'm') && time < request.time + duration.value(5, 'm');
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser(data) {
+      return data.uid is string && 
+             data.email is string && 
+             data.role in ['resident', 'admin'];
+    }
+
+    function isValidServiceRequest(data) {
+      return data.residentUid is string &&
+             data.residentName is string &&
+             data.serviceType is string &&
+             data.status in ['pending', 'approved', 'disapproved', 'completed'];
+    }
+
+    function isValidNotification(data) {
+      return data.userId is string &&
+             data.message is string &&
+             data.read is bool;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (isOwner(userId) || isAdmin());
+      allow create: if isAuthenticated() && (isOwner(userId) || isAdmin());
+      allow update: if isAuthenticated() && (isOwner(userId) || isAdmin());
+    }
+
+    match /serviceRequests/{requestId} {
+      // Allow all authenticated users to read so they can calculate queue load/recommendations
+      // NOTE: In a production app, you should denormalize queue counts to a public collection 
+      // to avoid exposing resident PII (names, ages, etc.) to other residents.
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && (request.auth.uid == request.resource.data.residentUid || isAdmin());
+      allow update: if isAuthenticated() && (request.auth.uid == resource.data.residentUid || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    match /notifications/{notificationId} {
+      allow read: if isAuthenticated() && (isOwner(resource.data.userId) || (resource.data.userId == 'admin' && isAdmin()));
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && (isOwner(resource.data.userId) || (resource.data.userId == 'admin' && isAdmin()));
+      allow delete: if isAuthenticated() && (isOwner(resource.data.userId) || (resource.data.userId == 'admin' && isAdmin()));
+    }
+
+    match /settings/{settingId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /announcements/{announcementId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+    
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

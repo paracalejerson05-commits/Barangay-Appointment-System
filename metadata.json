@@ -1,0 +1,8 @@
+{
+  "name": "Barangay Smart Appointment System",
+  "description": "A smart appointment and queue management portal for Barangay Pupua public services, featuring appointment booking, document requests, and real-time status tracking.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
