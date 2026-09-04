@@ -91,7 +91,7 @@ export function ResidentRequests({ user, profile }: ResidentRequestsProps) {
       {/* Page Title - Clean & Compact without large logo */}
       <div className="mb-2">
         <h2 className="text-2xl sm:text-3xl font-bold text-[#0F172A] tracking-tight">
-          My Service Requests
+          My Requests
         </h2>
         <p className="text-xs sm:text-sm text-[#64748B] mt-0.5 font-medium">
           Track the status and appointment schedule of your submitted barangay service requests.

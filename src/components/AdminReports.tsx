@@ -162,7 +162,7 @@ export function AdminReports({ requests, residents }: { requests: any[], residen
             />
           </div>
           <div>
-            <h2 className="text-lg font-bold text-[#0F172A] leading-tight">Reports & Analytics</h2>
+            <h2 className="text-lg font-bold text-[#0F172A] leading-tight">Reports</h2>
             <p className="text-[11px] text-[#64748B]">Comprehensive overview of barangay services.</p>
           </div>
         </div>

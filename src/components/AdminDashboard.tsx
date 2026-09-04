@@ -179,10 +179,10 @@ export function AdminDashboard({ user, profile }: AdminDashboardProps) {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-2 border-b border-[#E2E8F0] flex-shrink-0">
           <div>
             <h1 className="text-xl sm:text-2xl font-bold text-[#0F172A] tracking-tight">
-              {isOverviewPage ? 'Admin Overview' : 
+              {isOverviewPage ? 'Admin Dashboard' : 
                isRequestsPage ? 'Service Requests' : 
                isResidentsPage ? 'Residents' : 
-               isSchedulePage ? 'Schedule Management' :
+               isSchedulePage ? 'Schedule & Announcements' :
                ''}
             </h1>
             {isOverviewPage && (

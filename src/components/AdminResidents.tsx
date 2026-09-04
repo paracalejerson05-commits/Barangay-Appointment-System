@@ -139,7 +139,7 @@ export function AdminResidents({ residents, onAction }: AdminResidentsProps) {
         {/* Toolbar */}
         <div className="p-3 border-b border-[#E2E8F0] bg-[#F8FAFC] flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <h2 className="text-sm font-bold text-[#0F172A] mr-2">Resident Directory</h2>
+            <h2 className="text-sm font-bold text-[#0F172A] mr-2">Residents</h2>
             
             {/* Status Filters */}
             <div className="flex items-center bg-white border border-[#E2E8F0] rounded-[6px] p-0.5 shadow-sm overflow-hidden">

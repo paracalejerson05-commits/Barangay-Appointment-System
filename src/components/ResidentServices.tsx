@@ -156,7 +156,7 @@ export function ResidentServices({ user, profile }: ResidentServicesProps) {
       {/* Compact Page Header without large logo */}
       <div className="text-center pt-1 pb-1">
         <h2 className="text-2xl sm:text-3xl font-bold text-[#0F172A] tracking-tight">
-          Request a Service
+          Services
         </h2>
         <p className="text-xs sm:text-sm text-[#64748B] mt-1 font-medium">
           Select the document or service you need and provide your details.
