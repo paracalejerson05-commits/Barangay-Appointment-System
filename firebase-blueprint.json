@@ -1,0 +1,88 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Profile information for residents and staff",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "role": { "type": "string", "enum": ["resident", "admin"] },
+        "age": { "type": "number" },
+        "gender": { "type": "string", "enum": ["Male", "Female", "Other"] },
+        "civilStatus": { "type": "string", "enum": ["Single", "Married", "Widowed", "Separated"] },
+        "address": { "type": "string" },
+        "barangay": { "type": "string" },
+        "city": { "type": "string" },
+        "province": { "type": "string" },
+        "contactNumber": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "approved", "disapproved"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "lastLoginAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "role"]
+    },
+    "ServiceRequest": {
+      "title": "ServiceRequest",
+      "description": "A request for a barangay service",
+      "type": "object",
+      "properties": {
+        "residentUid": { "type": "string" },
+        "residentName": { "type": "string" },
+        "residentEmail": { "type": "string" },
+        "age": { "type": "number" },
+        "gender": { "type": "string" },
+        "civilStatus": { "type": "string" },
+        "serviceType": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "approved", "disapproved", "completed"] },
+        "description": { "type": "string" },
+        "appointmentDate": { "type": "string", "format": "date-time" },
+        "appointmentTime": { "type": "string" },
+        "aiRecommendation": { "type": "string" },
+        "adminNotes": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["residentUid", "serviceType", "status", "createdAt"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "System notifications for users",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "type": { "type": "string" },
+        "read": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "message", "read", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles"
+    },
+    "/serviceRequests/{requestId}": {
+      "schema": "ServiceRequest",
+      "description": "Resident service requests"
+    },
+    "/notifications/{notificationId}": {
+      "schema": "Notification",
+      "description": "User notifications"
+    },
+    "/announcements/{announcementId}": {
+      "schema": "object",
+      "description": "Public announcements"
+    },
+    "/settings/{settingId}": {
+      "schema": "object",
+      "description": "Global application settings (e.g., schedule)"
+    }
+  }
+}

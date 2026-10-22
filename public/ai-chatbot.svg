@@ -1,0 +1,21 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <circle cx="137" cy="139" r="104" fill="#A9CBEF"/>
+  <path d="M23 37C23 21.536 35.536 9 51 9H99C114.464 9 127 21.536 127 37V65C127 80.464 114.464 93 99 93H88L99 111L66 93H51C35.536 93 23 80.464 23 65V37Z" fill="#5797D9"/>
+  <circle cx="54" cy="51" r="7" fill="white"/>
+  <circle cx="76" cy="51" r="7" fill="white"/>
+  <circle cx="98" cy="51" r="7" fill="white"/>
+  <path d="M96 111C96 98.85 105.85 89 118 89H158C170.15 89 180 98.85 180 111V158H96V111Z" fill="#E9E9E9"/>
+  <path d="M76 128C76 94.863 102.863 68 136 68C169.137 68 196 94.863 196 128V138C196 171.137 169.137 198 136 198C102.863 198 76 171.137 76 138V128Z" fill="#191919" stroke="#111111" stroke-width="5"/>
+  <path d="M79 117C75.134 117 72 120.134 72 124V143C72 146.866 75.134 150 79 150H84V117H79Z" fill="#191919" stroke="#111111" stroke-width="5"/>
+  <path d="M193 117C196.866 117 200 120.134 200 124V143C200 146.866 196.866 150 193 150H188V117H193Z" fill="#191919" stroke="#111111" stroke-width="5"/>
+  <path d="M77 119C77 89.177 101.177 65 131 65H141C170.823 65 195 89.177 195 119" stroke="#111111" stroke-width="7" stroke-linecap="round"/>
+  <path d="M108 117C113.523 110.333 124.477 110.333 130 117" stroke="#4CC9DF" stroke-width="5" stroke-linecap="round"/>
+  <path d="M147 117C152.523 110.333 163.477 110.333 169 117" stroke="#4CC9DF" stroke-width="5" stroke-linecap="round"/>
+  <path d="M127 125H145L143 136C142.319 139.724 139.066 142.5 135.28 142.5H134.72C130.934 142.5 127.681 139.724 127 136L125 125H127Z" fill="#4CC9DF"/>
+  <path d="M125 160H147V178H125V160Z" fill="#111111"/>
+  <path d="M105 178H167V188H105V178Z" fill="#111111"/>
+  <path d="M83 183C83 183 61 157 55 136C51 122 59 112 70 117C83 123 101 152 111 168L83 183Z" fill="#E9E9E9" stroke="#D4D4D4" stroke-width="3"/>
+  <path d="M183 174C183 174 207 150 208 132C209 118 201 111 191 117C179 124 164 151 157 168L183 174Z" fill="#E9E9E9" stroke="#D4D4D4" stroke-width="3"/>
+  <path d="M100 184C100 184 108 166 136 166C164 166 172 184 172 184V241H100V184Z" fill="#E9E9E9"/>
+  <circle cx="136" cy="204" r="18" fill="#4CC9DF"/>
+</svg>

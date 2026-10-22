@@ -1,0 +1,8 @@
+{
+  "name": "Barangay Pupua Portal",
+  "description": "Barangay Pupua Portal provides appointment booking, public service requests, and real-time status tracking.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
