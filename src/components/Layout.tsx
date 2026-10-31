@@ -590,13 +590,9 @@ export function Layout({ children, user, profile, onLogout }: LayoutProps) {
           </motion.header>
 
           {/* Mobile navigation */}
-          <nav className={cn(
-            "mobile-nav lg:hidden z-30 flex-shrink-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-[#E5E7EB] dark:border-slate-800 shadow-sm",
-            isAdmin && "admin-mobile-nav"
-          )} aria-label="Mobile navigation">
+          <nav className="mobile-nav lg:hidden" aria-label="Mobile navigation">
             <div className={cn(
-              "grid w-full items-center gap-0.5 px-2 py-1",
-              isAdmin && "admin-mobile-nav-items",
+              "mobile-nav-items grid w-full items-center",
               isAdmin ? "grid-cols-6" : "grid-cols-4"
             )}>
               {mobileMenuItems.map((item) => (
@@ -606,7 +602,7 @@ export function Layout({ children, user, profile, onLogout }: LayoutProps) {
                   end={item.label === 'Home'}
                   className={({ isActive }) => {
                     return cn(
-                      "flex min-h-11 min-w-0 flex-col items-center justify-center gap-0 rounded-[9px] px-0 text-[12px] font-semibold transition-all duration-200 active:scale-[0.96]",
+                      "mobile-nav-item flex min-h-12 min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-0 text-[11px] font-semibold transition-all duration-200 active:scale-[0.96]",
                       isActive
                         ? cn(
                             "bg-[#EFF6FF] text-[#2563EB] dark:bg-blue-950/60 dark:text-blue-300",
@@ -617,15 +613,15 @@ export function Layout({ children, user, profile, onLogout }: LayoutProps) {
                   }}
                   aria-label={item.label}
                 >
-                  <item.icon className="h-[22px] w-[22px] flex-shrink-0" strokeWidth={2} />
-                  <span className="whitespace-nowrap">{item.label}</span>
+                  <item.icon className="h-5 w-5 flex-shrink-0" strokeWidth={2} />
+                  <span>{item.label}</span>
                 </NavLink>
               ))}
               <button
                 type="button"
                 onClick={() => setIsMoreMenuOpen(true)}
                 className={cn(
-                  "flex min-h-11 min-w-0 flex-col items-center justify-center gap-0 rounded-[9px] px-0 text-[12px] font-semibold transition-all duration-200 active:scale-[0.96]",
+                  "mobile-nav-item flex min-h-12 min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-0 text-[11px] font-semibold transition-all duration-200 active:scale-[0.96]",
                   isMoreMenuOpen
                     ? cn(
                         "bg-[#EFF6FF] text-[#2563EB] dark:bg-blue-950/60 dark:text-blue-300",
@@ -636,14 +632,14 @@ export function Layout({ children, user, profile, onLogout }: LayoutProps) {
                 aria-label="More navigation options"
                 aria-expanded={isMoreMenuOpen}
               >
-                <Menu className="h-[22px] w-[22px] flex-shrink-0" strokeWidth={2} />
+                <Menu className="h-5 w-5 flex-shrink-0" strokeWidth={2} />
                 <span>More</span>
               </button>
             </div>
           </nav>
 
           {/* Page Content */}
-          <main className="mobile-compact-content flex-1 overflow-y-auto overflow-x-hidden px-[14px] py-3.5 sm:p-6 lg:p-8 bg-transparent min-w-0">
+          <main className="mobile-compact-content mobile-content-area flex-1 overflow-y-auto overflow-x-hidden px-[14px] py-3.5 sm:p-6 lg:p-8 bg-transparent min-w-0">
             {children}
           </main>
         </div>
