@@ -14,7 +14,7 @@ import {
   MessageSquare,
   BarChart3,
   Users,
-  Calendar,
+  CalendarDays,
   Sparkles,
   Search,
   Sun,
@@ -166,7 +166,7 @@ export function Layout({ children, user, profile, onLogout }: LayoutProps) {
     { icon: ClipboardList, label: 'Requests', path: '/requests' },
     { icon: Users, label: 'Residents', path: '/residents' },
     { icon: BarChart3, label: 'Reports', path: '/reports' },
-    { icon: Calendar, label: 'Schedule', path: '/schedule' },
+    { icon: CalendarDays, label: 'Schedule', path: '/schedule' },
     { icon: Settings, label: 'Settings', path: '/settings' },
   ];
 
@@ -182,7 +182,7 @@ export function Layout({ children, user, profile, onLogout }: LayoutProps) {
     { icon: LayoutDashboard, label: 'Home', path: '/' },
     { icon: ClipboardList, label: 'Requests', path: '/requests' },
     { icon: Users, label: 'Residents', path: '/residents' },
-    { icon: Calendar, label: 'Schedule', path: '/schedule' },
+    { icon: CalendarDays, label: 'Schedule', path: '/schedule' },
     { icon: BarChart3, label: 'Reports', path: '/reports' },
   ] : [
     { icon: LayoutDashboard, label: 'Home', path: '/' },
@@ -218,78 +218,105 @@ export function Layout({ children, user, profile, onLogout }: LayoutProps) {
         </svg>
       </div>
 
-      {/* Sidebar (Mobile drawer + Desktop sidebar) */}
-      <aside 
+      {/* Desktop Sidebar */}
+      <aside
         className={cn(
-          "hidden lg:block fixed inset-y-4 left-4 z-50 bg-[#15418C] text-white transition-all duration-300 ease-in-out shadow-xl",
-          isDesktopCollapsed ? "lg:w-20" : "lg:w-64",
-          "rounded-[20px]"
+          "fixed inset-y-4 left-4 z-50 hidden flex-col overflow-hidden rounded-2xl border border-[#DCE6F2] bg-white text-[#1E293B] shadow-[0_12px_36px_rgba(21,65,140,0.10)] transition-[width] duration-300 ease-in-out lg:flex",
+          isDesktopCollapsed ? "w-20" : "w-64"
         )}
+        aria-label={`${isAdmin ? 'Admin' : 'Resident'} navigation`}
       >
-        <div className="h-full flex flex-col p-4 relative">
-          
-          {/* Collapse/Expand Toggle (Desktop only) */}
-          <button
-            onClick={() => setIsDesktopCollapsed(!isDesktopCollapsed)}
-            className="hidden lg:flex absolute -right-3 top-6 bg-white text-[#15418C] w-7 h-7 rounded-full items-center justify-center shadow-md border border-gray-100 cursor-pointer z-50 hover:bg-gray-50 transition-colors"
-          >
-            {isDesktopCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
-          </button>
-          
-          <div className="flex-1 overflow-y-auto overflow-x-hidden no-scrollbar">
-            {/* Sidebar Brand */}
-            <Link 
-              to="/" 
+        <div className={cn("flex min-h-0 flex-1 flex-col", isDesktopCollapsed ? "p-3" : "p-4")}>
+          <div className={cn(
+            "flex min-h-[58px] items-center border-b border-[#E8EEF6]",
+            isDesktopCollapsed ? "flex-col justify-center gap-2 pb-3" : "gap-3 pb-4"
+          )}>
+            <Link
+              to="/"
               title={isDesktopCollapsed ? "Brgy. Pupua" : undefined}
               aria-label="Brgy. Pupua home"
               className={cn(
-                "flex min-h-10 items-center gap-3 pb-4 mb-3 border-b border-white/10 pr-8 lg:pr-0",
-                isDesktopCollapsed ? "justify-center" : "px-2"
+                "flex min-w-0 items-center rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB] focus-visible:ring-offset-2",
+                isDesktopCollapsed ? "justify-center" : "flex-1 gap-3"
               )}
             >
               <img
                 src={BARANGAY_LOGO_URL}
                 alt=""
-                className="h-10 w-10 flex-shrink-0 rounded-full border border-white/20 bg-white object-contain"
+                className="h-10 w-10 flex-shrink-0 rounded-full border border-[#E2E8F0] bg-white object-contain"
                 referrerPolicy="no-referrer"
               />
-              <div className={cn("min-w-0 transition-opacity duration-200", isDesktopCollapsed && "hidden")}>
-                <span className="block whitespace-nowrap font-sans text-[20px] font-semibold leading-tight tracking-tight text-white">
-                  Brgy. Pupua
+              {!isDesktopCollapsed && (
+                <span className="min-w-0">
+                  <span className="block truncate text-[17px] font-bold leading-tight tracking-[-0.02em] text-[#15418C]">
+                    Brgy. Pupua
+                  </span>
+                  <span className="mt-1 block truncate text-[9px] font-semibold uppercase tracking-[0.13em] text-[#718096]">
+                    Public Service Portal
+                  </span>
                 </span>
-              </div>
+              )}
             </Link>
+            {!isDesktopCollapsed && (
+              <button
+                type="button"
+                onClick={() => setIsDesktopCollapsed(true)}
+                className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-[#64748B] transition-colors duration-150 hover:bg-[#F1F5F9] hover:text-[#15418C] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB]"
+                aria-label="Collapse sidebar"
+                title="Collapse sidebar"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+            )}
+            {isDesktopCollapsed && (
+              <button
+                type="button"
+                onClick={() => setIsDesktopCollapsed(false)}
+                className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#F1F5F9] text-[#15418C] transition-colors duration-150 hover:bg-[#E5EDF8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB]"
+                aria-label="Expand sidebar"
+                title="Expand sidebar"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            )}
+          </div>
 
-            {/* Nav Menu */}
-            <nav className="space-y-1.5 mt-4">
+          <div className={cn("min-h-0 flex-1 overflow-y-auto overflow-x-hidden pt-5", isDesktopCollapsed && "pt-6")}>
+            {!isDesktopCollapsed && (
+              <p className="mb-2.5 px-2 text-[10px] font-bold uppercase tracking-[0.16em] text-[#8291A6]">
+                {isAdmin ? 'Admin Overview' : 'Resident Overview'}
+              </p>
+            )}
+            <nav className="space-y-1" aria-label="Main navigation">
               {menuItems.map((item) => (
                 <NavLink
                   key={item.path}
                   to={item.path}
+                  end={item.path === '/'}
                   title={isDesktopCollapsed ? item.label : undefined}
+                  aria-label={isDesktopCollapsed ? item.label : undefined}
                   className={({ isActive }) => cn(
-                    "flex items-center px-3.5 py-3 rounded-[12px] font-medium text-[14px] lg:text-[13px] transition-all duration-200 group relative active:scale-[0.98]",
-                    isActive 
-                      ? "bg-white/15 text-white shadow-inner font-semibold" 
-                      : "text-white/80 hover:bg-white/10 hover:text-white"
+                    "group relative flex min-h-11 items-center rounded-[13px] px-3 text-[13px] font-semibold transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB] focus-visible:ring-offset-2",
+                    isDesktopCollapsed ? "justify-center" : "gap-3",
+                    isActive
+                      ? "bg-gradient-to-r from-[#EAF2FF] to-[#F3F7FF] text-[#15418C] shadow-[0_3px_10px_rgba(21,65,140,0.08)]"
+                      : "text-[#64748B] hover:bg-[#F4F7FB] hover:text-[#15418C]"
                   )}
                 >
                   {({ isActive }) => (
                     <>
-                      <div className={cn(
-                        "flex items-center justify-center flex-shrink-0 transition-transform duration-200",
-                        isDesktopCollapsed ? "mx-auto" : "mr-3",
-                        isActive ? "scale-110" : "group-hover:scale-110"
-                      )}>
-                        <item.icon className="w-5 h-5 stroke-[2]" />
-                      </div>
-                      
-                      <span className={cn(
-                        "tracking-wide whitespace-nowrap transition-opacity duration-200",
-                        isDesktopCollapsed ? "hidden" : "block opacity-100"
-                      )}>
-                        {item.label}
-                      </span>
+                      {isActive && (
+                        <span className="absolute bottom-2.5 left-0 top-2.5 w-[3px] rounded-r-full bg-[#2563EB]" aria-hidden="true" />
+                      )}
+                      <item.icon
+                        className={cn(
+                          "h-[18px] w-[18px] flex-shrink-0 transition-transform duration-150 group-hover:-translate-y-px",
+                          isActive ? "text-[#2563EB]" : "text-[#7B8BA1] group-hover:text-[#2563EB]"
+                        )}
+                        strokeWidth={1.9}
+                        aria-hidden="true"
+                      />
+                      {!isDesktopCollapsed && <span className="truncate">{item.label}</span>}
                     </>
                   )}
                 </NavLink>
@@ -297,25 +324,57 @@ export function Layout({ children, user, profile, onLogout }: LayoutProps) {
             </nav>
           </div>
 
-          {/* Bottom Actions */}
-          <div className="pt-4 mt-2 border-t border-white/10 space-y-2">
-
+          <div className={cn("mt-auto border-t border-[#E8EEF6] pt-3", isDesktopCollapsed && "flex flex-col items-center")}>
+            <div
+              className={cn(
+                "mb-2 flex min-w-0 items-center rounded-xl bg-[#F7F9FC] p-2",
+                isDesktopCollapsed ? "justify-center" : "gap-2.5"
+              )}
+              title={isDesktopCollapsed ? profile?.displayName || user.displayName || (isAdmin ? "Administrator" : "Resident") : undefined}
+            >
+              {user.photoURL ? (
+                <img
+                  src={user.photoURL}
+                  alt=""
+                  className="h-9 w-9 flex-shrink-0 rounded-full border border-white object-cover shadow-sm"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-[#E4EEFC] text-xs font-bold text-[#15418C]">
+                  {(profile?.displayName || user.displayName || (isAdmin ? 'Admin' : 'Resident'))
+                    .split(/\s+/)
+                    .map((part: string) => part[0])
+                    .join('')
+                    .slice(0, 2)
+                    .toUpperCase()}
+                </span>
+              )}
+              {!isDesktopCollapsed && (
+                <>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-xs font-bold text-[#26364A]">
+                      {isAdmin ? 'Admin' : 'Resident'}
+                    </span>
+                    <span className="block truncate text-[10px] text-[#718096]">
+                      {profile?.displayName || user.displayName || (isAdmin ? 'Administrator' : 'Resident Account')}
+                    </span>
+                  </span>
+                  <ChevronDown className="h-3.5 w-3.5 flex-shrink-0 text-[#8291A6]" aria-hidden="true" />
+                </>
+              )}
+            </div>
             <button
+              type="button"
               onClick={onLogout}
               title={isDesktopCollapsed ? "Sign Out" : undefined}
+              aria-label="Sign Out"
               className={cn(
-                "w-full flex items-center px-3.5 py-3 text-white/80 hover:bg-white/10 hover:text-white rounded-[12px] font-medium text-[13px] transition-all duration-200 cursor-pointer group active:scale-[0.98]"
+                "flex min-h-10 w-full items-center rounded-[11px] text-[12px] font-semibold text-[#64748B] transition-colors duration-150 hover:bg-red-50 hover:text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400",
+                isDesktopCollapsed ? "justify-center" : "gap-3 px-3"
               )}
             >
-              <div className={cn(
-                "flex items-center justify-center flex-shrink-0",
-                isDesktopCollapsed ? "mx-auto" : "mr-3"
-              )}>
-                <LogOut className="w-5 h-5 stroke-[2]" />
-              </div>
-              <span className={cn("tracking-wide whitespace-nowrap", isDesktopCollapsed && "hidden")}>
-                Sign Out
-              </span>
+              <LogOut className="h-[17px] w-[17px] flex-shrink-0" strokeWidth={1.9} aria-hidden="true" />
+              {!isDesktopCollapsed && <span>Sign Out</span>}
             </button>
           </div>
         </div>

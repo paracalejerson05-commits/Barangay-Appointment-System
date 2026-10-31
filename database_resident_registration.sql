@@ -185,6 +185,45 @@ CREATE POLICY "Restrict resident profile updates" ON public.users AS RESTRICTIVE
 CREATE POLICY "Restrict resident profile deletes" ON public.users AS RESTRICTIVE FOR DELETE TO public
   USING (public.is_admin());
 
+CREATE OR REPLACE FUNCTION public.notify_admin_profile_change()
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  resident_name text;
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'Authentication is required to send a profile update notification';
+  END IF;
+
+  SELECT display_name
+  INTO resident_name
+  FROM public.users
+  WHERE id = auth.uid()::text
+    AND role = 'resident'
+    AND lower(trim(coalesce(status, ''))) <> 'deactivated';
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'An active resident profile is required to send this notification';
+  END IF;
+
+  INSERT INTO public.notifications (user_id, title, message, type, is_read, created_at)
+  VALUES (
+    'admin',
+    'Resident Profile Updated',
+    format('%s updated their resident profile. Review the latest information in Residents.', coalesce(resident_name, 'A resident')),
+    'info',
+    false,
+    now()
+  );
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.notify_admin_profile_change() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.notify_admin_profile_change() TO authenticated;
+
 CREATE OR REPLACE FUNCTION public.is_approved_resident()
 RETURNS boolean
 LANGUAGE sql

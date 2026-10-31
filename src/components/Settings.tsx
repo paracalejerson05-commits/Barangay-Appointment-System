@@ -31,9 +31,9 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
-import { syncUserToSupabase } from '../lib/supabaseSync';
 import { supabase } from '../lib/supabase';
 import { checkProfileCompletion, getAccountStatus } from '../lib/profileUtils';
+import { getResidentAge } from '../lib/residentRegistrationValidation';
 
 interface SettingsProps {
   user: any;
@@ -46,7 +46,7 @@ const CONTACT_NUMBER_ERROR = 'Contact number must be 11 digits.';
 const AGE_ERROR = 'Age must be between 1 and 99.';
 
 const getContactNumberError = (value: string) => (/^\d{11}$/.test(value) ? '' : CONTACT_NUMBER_ERROR);
-const getAgeError = (value: string) => (/^\d+$/.test(value) && Number(value) >= 1 && Number(value) <= 99 ? '' : AGE_ERROR);
+const getAgeError = (value: number | null) => (value !== null && value >= 1 && value <= 99 ? '' : AGE_ERROR);
 
 export function Settings({ user, profile }: SettingsProps) {
   const { theme: themeMode, setTheme } = useTheme();
@@ -69,14 +69,19 @@ export function Settings({ user, profile }: SettingsProps) {
     fullName: profile?.displayName || profile?.display_name || user?.displayName || '',
     email: user?.email || '',
     contactNumber: profile?.contactNumber || profile?.contact_number || '',
-    address: profile?.address || '',
+    dateOfBirth: String(profile?.date_of_birth || profile?.dateOfBirth || '').slice(0, 10),
+    address: profile?.house_street || profile?.houseStreet || profile?.address || '',
+    purokSitio: profile?.purok_sitio || profile?.purokSitio || '',
     barangay: profile?.barangay || 'Pupua',
-    city: profile?.city || 'Catbalogan City',
+    city: profile?.city || profile?.municipality_city || 'Catbalogan City',
     province: profile?.province || 'Samar',
-    age: profile?.age !== undefined && profile?.age !== null ? String(profile?.age) : '',
+    age: profile?.date_of_birth || profile?.dateOfBirth
+      ? String(getResidentAge(String(profile.date_of_birth || profile.dateOfBirth).slice(0, 10)) ?? profile?.age ?? '')
+      : profile?.age !== undefined && profile?.age !== null ? String(profile?.age) : '',
     gender: profile?.gender || 'Male',
-    civilStatus: profile?.civilStatus || 'Single'
+    civilStatus: profile?.civilStatus || profile?.civil_status || 'Single'
   });
+  const savedProfileData = useRef({ ...profileData, photo: previewImage || '' });
 
   const userMetadata = user?.user_metadata || {};
 
@@ -88,13 +93,17 @@ export function Settings({ user, profile }: SettingsProps) {
         fullName: profile.displayName || profile.display_name || user?.displayName || prev.fullName,
         email: user?.email || profile.email || prev.email,
         contactNumber: profile.contactNumber !== undefined ? profile.contactNumber : (profile.contact_number !== undefined ? profile.contact_number : prev.contactNumber),
-        address: profile.address !== undefined ? profile.address : prev.address,
+        dateOfBirth: String(profile.date_of_birth || profile.dateOfBirth || prev.dateOfBirth).slice(0, 10),
+        address: profile.house_street || profile.houseStreet || profile.address || prev.address,
+        purokSitio: profile.purok_sitio || profile.purokSitio || prev.purokSitio,
         barangay: profile.barangay !== undefined ? profile.barangay : prev.barangay,
-        city: profile.city !== undefined ? profile.city : prev.city,
+        city: profile.city || profile.municipality_city || prev.city,
         province: profile.province !== undefined ? profile.province : prev.province,
-        age: profile.age !== undefined && profile.age !== null ? String(profile.age) : prev.age,
+        age: profile.date_of_birth || profile.dateOfBirth
+          ? String(getResidentAge(String(profile.date_of_birth || profile.dateOfBirth).slice(0, 10)) ?? profile.age ?? prev.age)
+          : profile.age !== undefined && profile.age !== null ? String(profile.age) : prev.age,
         gender: profile.gender || prev.gender,
-        civilStatus: profile.civilStatus || prev.civilStatus
+        civilStatus: profile.civilStatus || profile.civil_status || prev.civilStatus
       }));
       if (profile.photoURL !== undefined || profile.photo_url !== undefined || user?.photoURL !== undefined || userMetadata.photoURL !== undefined || userMetadata.avatar_url !== undefined || userMetadata.picture !== undefined) {
         setPreviewImage(profile.photoURL || profile.photo_url || user?.photoURL || userMetadata.photoURL || userMetadata.avatar_url || userMetadata.picture || null);
@@ -205,9 +214,10 @@ export function Settings({ user, profile }: SettingsProps) {
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     const contactNumberError = getContactNumberError(String(profileData.contactNumber || ''));
-    const ageError = getAgeError(String(profileData.age || ''));
+    const age = getResidentAge(profileData.dateOfBirth);
+    const ageError = getAgeError(age);
     setProfileFieldErrors({ contactNumber: contactNumberError, age: ageError });
-    if (contactNumberError || ageError) {
+    if (contactNumberError || ageError || age === null || age < 1 || age > 99) {
       setError(null);
       return;
     }
@@ -223,35 +233,85 @@ export function Settings({ user, profile }: SettingsProps) {
         throw new Error('User identifier not found. Please log in again.');
       }
 
-      const synced = await syncUserToSupabase(
-          { uid: targetUid, email: user?.email || profileData.email, displayName: profileData.fullName },
-          {
-            uid: targetUid,
-            email: user?.email || profileData.email,
-            displayName: profileData.fullName,
-            contactNumber: profileData.contactNumber,
-            address: profileData.address,
-            barangay: profileData.barangay,
-            city: profileData.city,
-            province: profileData.province,
-            age: profileData.age,
-            gender: profileData.gender,
-            civilStatus: profileData.civilStatus,
-            role: profile?.role || 'resident',
-            status: profile?.status || 'pending'
-          }
-        );
-      if (!synced) throw new Error('Your profile could not be saved to the application database. Please try again.');
+      const streetAddress = profileData.address.trim();
+      const purokSitio = profileData.purokSitio.trim();
+      const barangay = profileData.barangay.trim();
+      const city = profileData.city.trim();
+      const province = profileData.province.trim();
+      const address = [
+        streetAddress,
+        purokSitio,
+        barangay,
+        city,
+        province
+      ].filter((part) => Boolean(String(part || '').trim())).join(', ');
+      const changedFields = [
+        [savedProfileData.current.fullName, profileData.fullName.trim(), 'Full name'],
+        [savedProfileData.current.contactNumber, profileData.contactNumber.trim(), 'Contact number'],
+        [savedProfileData.current.dateOfBirth, profileData.dateOfBirth, 'Date of birth'],
+        [savedProfileData.current.gender, profileData.gender, 'Gender'],
+        [savedProfileData.current.civilStatus, profileData.civilStatus, 'Civil status'],
+        [savedProfileData.current.address, streetAddress, 'Street address'],
+        [savedProfileData.current.purokSitio, purokSitio, 'Purok/Sitio'],
+        [savedProfileData.current.barangay, barangay, 'Barangay'],
+        [savedProfileData.current.city, city, 'Municipality/City'],
+        [savedProfileData.current.province, province, 'Province'],
+        [savedProfileData.current.photo, previewImage || '', 'Profile photo']
+      ].filter(([previous, next]) => String(previous || '').trim() !== String(next || '').trim())
+        .map(([, , label]) => label);
+      const { data: savedProfile, error: profileError } = await supabase
+        .from('users')
+        .update({
+          display_name: profileData.fullName.trim(),
+          contact_number: profileData.contactNumber.trim(),
+          date_of_birth: profileData.dateOfBirth,
+          age: age!,
+          gender: profileData.gender,
+          civil_status: profileData.civilStatus,
+          address,
+          house_street: streetAddress,
+          purok_sitio: purokSitio,
+          barangay,
+          municipality_city: city,
+          province,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', targetUid)
+        .select('id')
+        .maybeSingle();
+      if (profileError) throw profileError;
+      if (!savedProfile) {
+        throw new Error('Your resident profile was not found. Please sign out and sign in again.');
+      }
 
-      await supabase.auth.updateUser({
+      const { error: authError } = await supabase.auth.updateUser({
         data: {
           full_name: profileData.fullName,
           display_name: profileData.fullName,
           photoURL: previewImage || null
         }
       });
+      if (authError) throw authError;
 
-      setSuccessMessage('Your profile has been updated successfully.');
+      savedProfileData.current = { ...profileData, age: String(age), photo: previewImage || '' };
+      setProfileData(prev => ({ ...prev, age: String(age) }));
+
+      if (changedFields.length > 0) {
+        try {
+          const { error: notificationError } = await supabase.rpc('notify_admin_profile_change');
+          if (notificationError) throw notificationError;
+        } catch (notificationError) {
+          console.error('Profile saved, but the administrator could not be notified:', notificationError);
+          setSuccessMessage('Your profile was saved, but the administrator notification could not be sent. Please contact the barangay office.');
+          setShowSuccess(true);
+          setTimeout(() => setShowSuccess(false), 6000);
+          return;
+        }
+      }
+
+      setSuccessMessage(changedFields.length > 0
+        ? 'Your profile has been updated and the administrator has been notified.'
+        : 'Your profile has been updated successfully.');
       setShowSuccess(true);
       setTimeout(() => setShowSuccess(false), 4000);
     } catch (err: any) {
@@ -708,7 +768,9 @@ export function Settings({ user, profile }: SettingsProps) {
                 <form onSubmit={handleSaveProfile} noValidate className="space-y-4">
                   <div>
                     <h4 className="text-xs font-bold text-[#0F172A] dark:text-slate-200 uppercase tracking-wider mb-1">Personal Information</h4>
-                    <p className="text-[11px] text-[#64748B] dark:text-slate-400">All required fields are marked with an asterisk (<span className="text-red-500 font-bold">*</span>).</p>
+                    <p className="text-[11px] text-[#64748B] dark:text-slate-400">
+                      Update your registration details here. Valid ID documents and face verification are not displayed in settings.
+                    </p>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
@@ -741,6 +803,33 @@ export function Settings({ user, profile }: SettingsProps) {
                       />
                     </div>
 
+                    {/* Date of Birth */}
+                    <div>
+                      <label className="block text-xs sm:text-[13px] font-semibold text-[#0F172A] dark:text-slate-200 mb-1.5">
+                        Date of Birth <span className="text-red-500 font-bold">*</span>
+                      </label>
+                      <input
+                        type="date"
+                        required
+                        max={new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 10)}
+                        value={profileData.dateOfBirth}
+                        onChange={(e) => {
+                          const dateOfBirth = e.target.value;
+                          const age = getResidentAge(dateOfBirth);
+                          setProfileData(prev => ({
+                            ...prev,
+                            dateOfBirth,
+                            age: age === null ? '' : String(age)
+                          }));
+                          setProfileFieldErrors(prev => ({
+                            ...prev,
+                            age: getAgeError(age)
+                          }));
+                        }}
+                        className="w-full bg-white dark:bg-slate-800 border border-[#E2E8F0] dark:border-slate-700 rounded-[10px] px-3.5 py-2.5 h-11 sm:h-10 text-xs sm:text-sm text-[#0F172A] dark:text-slate-100 focus:border-[#2563EB] focus:ring-2 focus:ring-blue-50 focus:outline-none transition-colors"
+                      />
+                    </div>
+
                     {/* Contact Number */}
                     <div>
                       <label className="block text-xs sm:text-[13px] font-semibold text-[#0F172A] dark:text-slate-200 mb-1.5">
@@ -767,29 +856,19 @@ export function Settings({ user, profile }: SettingsProps) {
                       {profileFieldErrors.contactNumber && <p className="mt-1 text-xs text-red-600 dark:text-red-400" role="alert">{profileFieldErrors.contactNumber}</p>}
                     </div>
 
-                    {/* Age */}
+                    {/* Age (calculated from date of birth) */}
                     <div>
                       <label className="block text-xs sm:text-[13px] font-semibold text-[#0F172A] dark:text-slate-200 mb-1.5">
                         Age <span className="text-red-500 font-bold">*</span>
                       </label>
                       <input 
                         type="text"
-                        inputMode="numeric"
-                        required
+                        readOnly
                         aria-invalid={Boolean(profileFieldErrors.age)}
                         value={profileData.age}
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          if (value !== '' && getAgeError(value)) {
-                            setProfileFieldErrors(prev => ({ ...prev, age: AGE_ERROR }));
-                            return;
-                          }
-                          setProfileData({ ...profileData, age: value });
-                          setProfileFieldErrors(prev => ({ ...prev, age: getAgeError(value) }));
-                        }}
-                        className="w-full bg-white dark:bg-slate-800 border border-[#E2E8F0] dark:border-slate-700 rounded-[10px] px-3.5 py-2.5 h-11 sm:h-10 text-xs sm:text-sm text-[#0F172A] dark:text-slate-100 focus:border-[#2563EB] focus:ring-2 focus:ring-blue-50 focus:outline-none transition-colors"
-                        placeholder="e.g. 28"
+                        className="h-11 w-full cursor-not-allowed rounded-[10px] border border-[#E2E8F0] bg-[#F8FAFC] px-3.5 py-2.5 text-xs text-[#64748B] dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-400 sm:h-10"
                       />
+                      <p className="mt-1 text-[11px] text-[#64748B] dark:text-slate-400">Age is calculated from your date of birth.</p>
                       {profileFieldErrors.age && <p className="mt-1 text-xs text-red-600 dark:text-red-400" role="alert">{profileFieldErrors.age}</p>}
                     </div>
 
@@ -839,6 +918,19 @@ export function Settings({ user, profile }: SettingsProps) {
                       onChange={(e) => setProfileData({ ...profileData, address: e.target.value })}
                       className="w-full bg-white dark:bg-slate-800 border border-[#E2E8F0] dark:border-slate-700 rounded-[10px] px-3.5 py-2.5 h-11 sm:h-10 text-xs sm:text-sm text-[#0F172A] dark:text-slate-100 focus:border-[#2563EB] focus:ring-2 focus:ring-blue-50 focus:outline-none transition-colors"
                       placeholder="Purok 2, Coastal Road"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs sm:text-[13px] font-semibold text-[#0F172A] dark:text-slate-200 mb-1.5">
+                      Purok / Sitio <span className="text-red-500 font-bold">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={profileData.purokSitio}
+                      onChange={(e) => setProfileData({ ...profileData, purokSitio: e.target.value })}
+                      className="w-full bg-white dark:bg-slate-800 border border-[#E2E8F0] dark:border-slate-700 rounded-[10px] px-3.5 py-2.5 h-11 sm:h-10 text-xs sm:text-sm text-[#0F172A] dark:text-slate-100 focus:border-[#2563EB] focus:ring-2 focus:ring-blue-50 focus:outline-none transition-colors"
                     />
                   </div>
 
