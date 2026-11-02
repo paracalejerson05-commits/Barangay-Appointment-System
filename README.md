@@ -4,6 +4,7 @@
 
 - The Vite frontend is deployed on Vercel.
 - The Express API runs as a Vercel serverless function in `api/[...path].ts`.
+- `vercel.json` routes `/api/*` to that function before applying the SPA fallback, so API methods and request bodies are handled by Express.
 - Connect the GitHub repository to Vercel to deploy the frontend and API together.
 
 ## Required environment variables
