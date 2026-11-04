@@ -261,12 +261,12 @@ export function AdminResidents({ residents, onAction }: AdminResidentsProps) {
       // 4. Update local state
       setResidentList(prev => prev.map(r => {
         if ((r.uid || r.id) === targetUid) {
-          return { ...r, status: 'rejected', verification_status: 'rejected' };
+          return { ...r, status: 'inactive', verification_status: 'rejected' };
         }
         return r;
       }));
 
-      setSelectedResident((prev: any) => prev && (prev.uid || prev.id) === targetUid ? { ...prev, status: 'rejected', verification_status: 'rejected' } : prev);
+      setSelectedResident((prev: any) => prev && (prev.uid || prev.id) === targetUid ? { ...prev, status: 'inactive', verification_status: 'rejected' } : prev);
 
       setNotification({
         type: 'success',

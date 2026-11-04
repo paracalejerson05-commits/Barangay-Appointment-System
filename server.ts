@@ -383,10 +383,13 @@ async function createApp() {
       if (authenticatedUser.id !== residentUid) {
         return res.status(403).json({ error: 'You can only submit requests for your own account.' });
       }
+      if (!supabaseServiceRoleKey) {
+        return res.status(503).json({
+          error: 'Secure appointment and transaction processing requires a server-side SUPABASE_SECRET_KEY or SUPABASE_SERVICE_ROLE_KEY.'
+        });
+      }
 
-      // Use the service client when configured; otherwise, read the resident's
-      // own profile through their authenticated session.
-      const requestClient = supabaseServiceRoleKey ? supabaseAdmin : getRequestSupabaseClient(req);
+      const requestClient = supabaseAdmin;
       const { data: residentProfile, error: residentProfileError } = await requestClient
         .from('users')
         .select('role, status, verification_status, display_name, email, date_of_birth, age, gender, civil_status, contact_number, address, purok_sitio, barangay, municipality_city, province, id_type, id_front_path, face_photo_path, face_registration_method, privacy_consent_at')
@@ -471,6 +474,31 @@ async function createApp() {
         .maybeSingle();
       if (existingRequestError) throw existingRequestError;
       if (existingRequest) {
+        const { data: existingOrder, error: existingOrderError } = await requestClient
+          .from('orders')
+          .select('id')
+          .eq('service_request_id', existingRequest.id)
+          .limit(1)
+          .maybeSingle();
+        if (existingOrderError) throw existingOrderError;
+        if (!existingOrder) {
+          const { error: orderRetryError } = await requestClient.from('orders').insert([{
+            user_id: authenticatedUser.id,
+            service_request_id: existingRequest.id,
+            service_type: existingRequest.service_type,
+            amount: 0,
+            payment_method: 'Cash on Site',
+            status: 'pending',
+            appointment_date: existingRequest.appointment_date,
+            created_at: new Date().toISOString()
+          }]);
+          if (orderRetryError) {
+            console.error('[Service Request] Could not repair the missing transaction record:', orderRetryError.message);
+            return res.status(500).json({
+              error: 'The existing request was found, but its transaction record could not be saved. Contact the barangay office before retrying.'
+            });
+          }
+        }
         return res.status(200).json({
           request: existingRequest,
           alreadyReserved: true,
@@ -545,7 +573,7 @@ async function createApp() {
       }
 
       if (data) {
-        await requestClient.from('orders').insert([{
+        const { error: orderError } = await requestClient.from('orders').insert([{
           user_id: residentUid,
           service_request_id: data.id,
           service_type: serviceType,
@@ -555,6 +583,12 @@ async function createApp() {
           appointment_date: appointmentDate,
           created_at: new Date().toISOString()
         }]);
+        if (orderError) {
+          console.error('[Service Request] Could not create transaction record:', orderError.message);
+          return res.status(500).json({
+            error: 'The request was reserved, but its transaction record could not be saved. Contact the barangay office before retrying.'
+          });
+        }
       }
       return res.status(201).json({
         request: data,
@@ -780,13 +814,19 @@ async function createApp() {
 
     // Keep Gemini server-side so the API key never enters the browser bundle.
   app.post("/api/chat", async (req, res) => {
-    const message = typeof req.body?.message === 'string' ? req.body.message.trim() : '';
-    const conversationHistory = Array.isArray(req.body?.conversationHistory) ? req.body.conversationHistory : [];
-    const userId = typeof req.body?.userId === 'string' ? req.body.userId.trim() : '';
-    const role = req.body?.role === 'admin' ? 'admin' : 'resident';
+      const authUser = await getAuthenticatedUser(req);
+      if (!authUser) {
+        return res.status(401).json({ error: 'Your session has expired. Please sign in again.' });
+      }
+      if (isRateLimited(`chat:${authUser.id}`, 20, 60_000)) {
+        return res.status(429).json({ error: 'Too many chat requests. Please wait a minute and try again.' });
+      }
 
-    if (!message) {
-      return res.status(400).json({ error: 'A message is required.' });
+      const message = typeof req.body?.message === 'string' ? req.body.message.trim() : '';
+      const conversationHistory = Array.isArray(req.body?.conversationHistory) ? req.body.conversationHistory : [];
+
+      if (!message) {
+        return res.status(400).json({ error: 'A message is required.' });
     }
     if (message.length > 2000) {
       return res.status(400).json({ error: 'Message is too long.' });
@@ -798,12 +838,30 @@ async function createApp() {
     }
 
     try {
+      const requestClient = getRequestSupabaseClient(req);
+      const { data: userProfile, error: profileError } = await requestClient
+        .from('users')
+        .select('role, status')
+        .eq('id', authUser.id)
+        .maybeSingle();
+      if (profileError) {
+        console.error('[Chat] Could not verify the authenticated profile:', profileError.message);
+        return res.status(500).json({ error: 'Your account could not be verified. Please try again.' });
+      }
+      if (!userProfile || !['admin', 'resident'].includes(userProfile.role)
+        || userProfile.status === 'deactivated') {
+        return res.status(403).json({ error: 'This account cannot access the chatbot.' });
+      }
+
+      const role = userProfile.role;
       const [{ data: scheduleRow }, requestsResult, servicesResult] = await Promise.all([
-        supabase.from('settings').select('value').eq('key', 'schedule').maybeSingle(),
-        userId
-          ? supabase.from('service_requests').select('service_type, status, appointment_date, appointment_time').eq('resident_id', userId).order('created_at', { ascending: false }).limit(100)
-          : Promise.resolve({ data: [], error: null }),
-        supabase.from('services').select('title, description, category, processing_time').eq('is_active', true).order('title')
+        requestClient.from('settings').select('value').eq('key', 'schedule').maybeSingle(),
+        requestClient.from('service_requests')
+          .select('service_type, status, appointment_date, appointment_time')
+          .eq('resident_id', authUser.id)
+          .order('created_at', { ascending: false })
+          .limit(100),
+        requestClient.from('services').select('title, description, category, processing_time').eq('is_active', true).order('title')
       ]);
 
       if (requestsResult.error) {
@@ -907,17 +965,74 @@ ${JSON.stringify(services)}`;
   // Supabase Checkout Endpoint
   app.post("/api/checkout", async (req, res) => {
     try {
-      const { userId, serviceType, amount, paymentMethod, status, appointmentDate } = req.body;
-      
-      const { data, error } = await supabase
+      const authUser = await getAuthenticatedUser(req);
+      if (!authUser) {
+        return res.status(401).json({ error: 'Your session has expired. Please sign in again.' });
+      }
+      if (isRateLimited(`checkout:${authUser.id}`, 10, 60_000)) {
+        return res.status(429).json({ error: 'Too many checkout attempts. Please wait a minute and try again.' });
+      }
+
+      const userId = typeof req.body?.userId === 'string' ? req.body.userId.trim() : '';
+      const serviceType = typeof req.body?.serviceType === 'string' ? req.body.serviceType.trim() : '';
+      const appointmentDate = typeof req.body?.appointmentDate === 'string' ? req.body.appointmentDate : '';
+      if (!userId || userId !== authUser.id) {
+        return res.status(403).json({ error: 'You can only create checkout records for your own account.' });
+      }
+      if (!supabaseServiceRoleKey) {
+        return res.status(503).json({
+          error: 'Secure checkout requires a server-side SUPABASE_SECRET_KEY or SUPABASE_SERVICE_ROLE_KEY.'
+        });
+      }
+      const parsedDate = /^\d{4}-\d{2}-\d{2}$/.test(appointmentDate)
+        ? new Date(`${appointmentDate}T00:00:00.000Z`)
+        : null;
+      if (!serviceType || serviceType.length > 255 || !parsedDate
+        || Number.isNaN(parsedDate.getTime())
+        || parsedDate.toISOString().slice(0, 10) !== appointmentDate
+        || appointmentDate < getAppointmentDateKey()) {
+        return res.status(400).json({ error: 'A valid service and appointment date are required.' });
+      }
+
+      const requestClient = supabaseAdmin;
+      const { data: profile, error: profileError } = await requestClient
+        .from('users')
+        .select('role, status, verification_status')
+        .eq('id', authUser.id)
+        .maybeSingle();
+      if (profileError) {
+        console.error('[Checkout] Could not verify the authenticated profile:', profileError.message);
+        return res.status(500).json({ error: 'Your account could not be verified. Please try again.' });
+      }
+      if (profile?.role !== 'resident'
+        || !['active', 'approved'].includes(String(profile.status || '').toLowerCase())
+        || String(profile.verification_status || '').toLowerCase() !== 'approved') {
+        return res.status(403).json({ error: 'Only approved residents can create checkout records.' });
+      }
+
+      const { data: service, error: serviceError } = await requestClient
+        .from('services')
+        .select('title, fee')
+        .eq('title', serviceType)
+        .eq('is_active', true)
+        .maybeSingle();
+      if (serviceError) {
+        console.error('[Checkout] Could not verify the selected service:', serviceError.message);
+        return res.status(500).json({ error: 'The selected service could not be verified.' });
+      }
+      if (!service || !Number.isFinite(Number(service.fee)) || Number(service.fee) < 0) {
+        return res.status(400).json({ error: 'Select an active service from the service catalog.' });
+      }
+
+      const { data, error } = await requestClient
         .from('orders')
         .insert([
           { 
-            user_id: userId, 
-            service_type: serviceType, 
-            amount: amount, 
-            payment_method: paymentMethod, 
-            status: status || 'pending',
+            user_id: authUser.id,
+            service_type: service.title,
+            amount: Number(service.fee),
+            payment_method: 'Cash on Site',
+            status: 'pending',
             appointment_date: appointmentDate,
             created_at: new Date().toISOString()
           }
@@ -925,13 +1040,14 @@ ${JSON.stringify(services)}`;
         .select();
 
       if (error) {
-        throw error;
+        console.error('[Checkout] Could not create checkout record:', error.message);
+        return res.status(500).json({ error: 'Checkout could not be saved. Please try again.' });
       }
 
-      res.status(200).json({ success: true, message: "Checkout data saved successfully", data });
+      return res.status(200).json({ success: true, message: "Checkout data saved successfully", data });
     } catch (error) {
-      console.error("Error saving checkout data:", error);
-      res.status(500).json({ error: "Failed to save checkout data", details: error });
+      console.error("[Checkout] Unexpected error:", error);
+      return res.status(500).json({ error: "Checkout could not be saved. Please try again." });
     }
   });
 
@@ -1263,6 +1379,77 @@ ${JSON.stringify(services)}`;
     }
   });
 
+  app.post("/api/announcements/:id/notify", async (req, res) => {
+    try {
+      if (!await requireAdmin(req, res)) return;
+      if (!supabaseServiceRoleKey) {
+        return res.status(503).json({
+          error: 'Resident announcement notifications require a server-side SUPABASE_SECRET_KEY or SUPABASE_SERVICE_ROLE_KEY.'
+        });
+      }
+
+      const { id } = req.params;
+      if (!id) return res.status(400).json({ error: 'Announcement ID is required.' });
+
+      const { data: announcement, error: announcementError } = await supabaseAdmin
+        .from('announcements')
+        .select('id, title, content, status')
+        .eq('id', id)
+        .maybeSingle();
+      if (announcementError) throw announcementError;
+      if (!announcement) return res.status(404).json({ error: 'Announcement was not found.' });
+      if (announcement.status !== 'Published') {
+        return res.status(400).json({ error: 'Only published announcements can be sent to residents.' });
+      }
+
+      const { data: residents, error: residentsError } = await supabaseAdmin
+        .from('users')
+        .select('id')
+        .eq('role', 'resident')
+        .neq('status', 'deactivated');
+      if (residentsError) throw residentsError;
+      if (!residents?.length) return res.status(200).json({ notifiedCount: 0 });
+
+      const notificationTitle = announcement.title;
+      let notifiedCount = 0;
+      const batchSize = 250;
+
+      for (let offset = 0; offset < residents.length; offset += batchSize) {
+        const residentIds = residents.slice(offset, offset + batchSize).map((resident: { id: string }) => resident.id);
+        const { data: existingNotifications, error: existingError } = await supabaseAdmin
+          .from('notifications')
+          .select('user_id')
+          .eq('title', notificationTitle)
+          .eq('message', announcement.content)
+          .in('user_id', residentIds);
+        if (existingError) throw existingError;
+
+        const alreadyNotified = new Set((existingNotifications || []).map((notification: { user_id: string }) => notification.user_id));
+        const notifications = residentIds
+          .filter(userId => !alreadyNotified.has(userId))
+          .map(userId => ({
+            user_id: userId,
+            title: notificationTitle,
+            message: announcement.content,
+            type: 'info',
+            is_read: false,
+            created_at: new Date().toISOString()
+          }));
+
+        if (notifications.length) {
+          const { error: insertError } = await supabaseAdmin.from('notifications').insert(notifications);
+          if (insertError) throw insertError;
+          notifiedCount += notifications.length;
+        }
+      }
+
+      return res.status(200).json({ notifiedCount });
+    } catch (error: any) {
+      console.error('[Announcements] Failed to notify residents:', error?.message || error);
+      return res.status(500).json({ error: 'The announcement was saved, but resident notifications could not be sent.' });
+    }
+  });
+
   // Supabase Resident Deactivation / Status Endpoint
   app.patch("/api/residents/:uid/status", async (req, res) => {
     try {
@@ -1371,14 +1558,14 @@ ${JSON.stringify(services)}`;
 
       // Auth admin operations require the optional service-role key. The public
       // database update below remains available without it.
-      if (supabaseServiceRoleKey && (status === 'deactivated' || status === 'inactive')) {
+      if (supabaseServiceRoleKey && status === 'deactivated') {
         try {
           await supabaseAdmin.auth.admin.updateUserById(uid, { ban_duration: '876000h' });
           console.log(`[Supabase Auth] Account ${uid} banned/deactivated in Supabase Auth`);
         } catch (authErr: any) {
           console.warn(`[Supabase Auth] Warning banning user in Auth:`, authErr?.message);
         }
-      } else if (supabaseServiceRoleKey && (status === 'active' || status === 'approved')) {
+      } else if (supabaseServiceRoleKey && ['active', 'approved', 'inactive'].includes(status)) {
         try {
           await supabaseAdmin.auth.admin.updateUserById(uid, { ban_duration: 'none' });
           console.log(`[Supabase Auth] Account ${uid} unbanned/activated in Supabase Auth`);
@@ -1470,7 +1657,21 @@ ${JSON.stringify(services)}`;
 
   // Email sending endpoint
   app.post("/api/send-email", async (req, res) => {
-    const { to, subject, html } = req.body;
+    const adminUser = await requireAdmin(req, res);
+    if (!adminUser) return;
+    if (isRateLimited(`send-email:${adminUser.id}`, 10, 60_000)) {
+      return res.status(429).json({ error: 'Too many email requests. Please wait a minute and try again.' });
+    }
+
+    const { to, subject, html } = req.body || {};
+    const emailAddress = typeof to === 'string' ? to.trim() : '';
+    const emailSubject = typeof subject === 'string' ? subject.trim() : '';
+    const emailHtml = typeof html === 'string' ? html : '';
+    if (emailAddress.length > 254 || !/^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(emailAddress)
+      || !emailSubject || emailSubject.length > 200 || /[\r\n]/.test(emailSubject)
+      || !emailHtml.trim() || emailHtml.length > 50_000) {
+      return res.status(400).json({ error: 'A valid recipient, subject, and email body are required.' });
+    }
 
     if (!process.env.SMTP_EMAIL || !process.env.SMTP_PASSWORD) {
       console.warn("SMTP credentials not configured. Simulating successful email send for preview environment.");
@@ -1488,15 +1689,15 @@ ${JSON.stringify(services)}`;
 
       await transporter.sendMail({
         from: `"Barangay Pupua Portal" <${process.env.SMTP_EMAIL}>`,
-        to,
-        subject,
-        html,
+        to: emailAddress,
+        subject: emailSubject,
+        html: emailHtml,
       });
 
       res.status(200).json({ success: true, message: "Email sent successfully" });
-    } catch (error) {
-      console.error("Error sending email:", error);
-      res.status(500).json({ error: "Failed to send email", details: error });
+    } catch (error: any) {
+      console.error('[Email] Delivery failed:', error?.message || 'Unknown SMTP error');
+      res.status(500).json({ error: "Failed to send email" });
     }
   });
 

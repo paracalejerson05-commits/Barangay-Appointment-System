@@ -239,37 +239,37 @@ export default function CertificateEditor({ request, onClose, onComplete, initia
   }, []);
 
   return createPortal(
-    <div className="fixed inset-0 z-[110] flex flex-col md:flex-row bg-white pdf-hide-bg">
+    <div className="certificate-editor fixed inset-0 z-[110] flex flex-col md:flex-row bg-white dark:bg-[#0B1120] pdf-hide-bg">
       {/* Sidebar Controls */}
-      <div className="w-full md:w-[320px] max-h-[44dvh] md:max-h-none shrink-0 border-b md:border-b-0 md:border-r border-[#E2E8F0] bg-white flex flex-col pdf-hidden md:h-full font-sans">
-        <div className="p-3 md:p-4 border-b border-[#E2E8F0] bg-[#F8FAFC]">
-          <h3 className="font-bold text-[#0F172A]">Certificate Editor</h3>
-          <p className="hidden md:block text-xs text-[#64748B]">Review and edit before printing</p>
+      <div className="w-full md:w-[320px] max-h-[44dvh] md:max-h-none shrink-0 border-b md:border-b-0 md:border-r border-[#E2E8F0] dark:border-slate-700 bg-white dark:bg-[#172033] flex flex-col pdf-hidden md:h-full font-sans">
+        <div className="p-3 md:p-4 border-b border-[#E2E8F0] dark:border-slate-700 bg-[#F8FAFC] dark:bg-[#1E293B]">
+          <h3 className="font-bold text-[#0F172A] dark:text-slate-100">Certificate Editor</h3>
+          <p className="hidden md:block text-xs text-[#64748B] dark:text-slate-400">Review and edit before printing</p>
         </div>
         
         <div className="flex-1 min-h-0 overflow-y-auto p-3 md:p-4 space-y-3 md:space-y-4">
-          <div className="hidden md:block bg-blue-50 text-blue-800 p-3 rounded-lg text-xs border border-blue-100">
+          <div className="hidden md:block bg-blue-50 dark:bg-blue-950/40 text-blue-800 dark:text-blue-200 p-3 rounded-lg text-xs border border-blue-100 dark:border-blue-900">
             Click on any underlined blank space to edit the resident information. All other text is strictly locked to match the official document template.
           </div>
           
-          <button onClick={handleReset} className="w-full flex items-center justify-center gap-2 py-2 px-4 bg-white border border-[#E2E8F0] rounded-[6px] text-[#0F172A] text-sm hover:bg-gray-50 transition-colors">
+          <button onClick={handleReset} className="w-full flex items-center justify-center gap-2 py-2 px-4 bg-white dark:bg-slate-800 border border-[#E2E8F0] dark:border-slate-700 rounded-[6px] text-[#0F172A] dark:text-slate-100 text-sm hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors">
             <RotateCcw className="w-4 h-4" /> Reset Data
           </button>
           
-          <button onClick={handleSave} disabled={isSaving} className="w-full flex items-center justify-center gap-2 py-2 px-4 bg-white border border-[#E2E8F0] rounded-[6px] text-[#0F172A] text-sm hover:bg-gray-50 transition-colors disabled:opacity-50">
+          <button onClick={handleSave} disabled={isSaving} className="w-full flex items-center justify-center gap-2 py-2 px-4 bg-white dark:bg-slate-800 border border-[#E2E8F0] dark:border-slate-700 rounded-[6px] text-[#0F172A] dark:text-slate-100 text-sm hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors disabled:opacity-50">
             {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} 
             Save Changes
           </button>
         </div>
 
-        <div className="p-3 md:p-4 border-t border-[#E2E8F0] bg-[#F8FAFC] grid grid-cols-2 md:flex md:flex-col gap-2">
+        <div className="p-3 md:p-4 border-t border-[#E2E8F0] dark:border-slate-700 bg-[#F8FAFC] dark:bg-[#1E293B] grid grid-cols-2 md:flex md:flex-col gap-2">
           {actionError && (
-            <div role="alert" className="col-span-2 md:col-span-1 flex items-start gap-2 p-2 text-xs text-red-700 bg-red-50 border border-red-200 rounded-[6px]">
+            <div role="alert" className="col-span-2 md:col-span-1 flex items-start gap-2 p-2 text-xs text-red-700 dark:text-red-200 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-[6px]">
               <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
               <span>{actionError}</span>
             </div>
           )}
-          <button onClick={handleDownloadPDF} disabled={isDownloading || isPrinting || isSaving} className="w-full flex items-center justify-center gap-2 py-2 px-4 bg-white border border-[#E2E8F0] rounded-[6px] text-[#0F172A] font-semibold text-sm hover:bg-gray-50 transition-colors disabled:opacity-50">
+          <button onClick={handleDownloadPDF} disabled={isDownloading || isPrinting || isSaving} className="w-full flex items-center justify-center gap-2 py-2 px-4 bg-white dark:bg-slate-800 border border-[#E2E8F0] dark:border-slate-700 rounded-[6px] text-[#0F172A] dark:text-slate-100 font-semibold text-sm hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors disabled:opacity-50">
             {isDownloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
             Download PDF
           </button>
@@ -279,14 +279,14 @@ export default function CertificateEditor({ request, onClose, onComplete, initia
             {request.status === 'completed' ? 'Reprint Document' : 'Print Document'}
           </button>
 
-          <button onClick={onClose} className="col-span-2 md:col-span-1 w-full py-2 px-4 text-[#64748B] hover:text-[#0F172A] text-sm transition-colors">
+          <button onClick={onClose} className="col-span-2 md:col-span-1 w-full py-2 px-4 text-[#64748B] dark:text-slate-400 hover:text-[#0F172A] dark:hover:text-slate-100 text-sm transition-colors">
             Cancel & Close
           </button>
         </div>
       </div>
 
       {/* Main Preview Area */}
-      <div ref={previewAreaRef} className="flex-1 min-h-0 min-w-0 overflow-auto bg-[#F1F5F9] flex items-start justify-center p-3 md:p-8 print:p-0 print:bg-white pdf-print-container">
+      <div ref={previewAreaRef} className="flex-1 min-h-0 min-w-0 overflow-auto bg-[#F1F5F9] dark:bg-[#0B1120] flex items-start justify-center p-3 md:p-8 print:p-0 print:bg-white pdf-print-container">
         <div
           className="certificate-preview-frame flex-shrink-0"
           style={{ width: pageSize.width * previewScale, height: pageSize.height * previewScale }}

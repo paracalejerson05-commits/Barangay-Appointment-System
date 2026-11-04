@@ -13,22 +13,43 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 const getThemeStorageKey = (userId: string) => `app_theme_${userId}`;
 
+function applyResolvedTheme(theme: 'light' | 'dark') {
+  document.documentElement.classList.toggle('dark', theme === 'dark');
+  document.documentElement.style.colorScheme = theme;
+  document.documentElement.style.backgroundColor = theme === 'dark' ? '#0B1120' : '#F4F7FB';
+}
+
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [userId, setUserId] = useState<string | null>(null);
   const [theme, setThemeState] = useState<ThemeMode>('system');
+
+  const setActiveUser = (nextUserId: string | null) => {
+    setUserId(nextUserId);
+    if (!nextUserId) {
+      setThemeState('system');
+      return;
+    }
+
+    try {
+      const saved = localStorage.getItem(getThemeStorageKey(nextUserId));
+      setThemeState(saved === 'light' || saved === 'dark' || saved === 'system' ? saved : 'system');
+    } catch {
+      setThemeState('system');
+    }
+  };
 
   useEffect(() => {
     let mounted = true;
 
     const loadUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      if (mounted) setUserId(session?.user?.id || null);
+      if (mounted) setActiveUser(session?.user?.id || null);
     };
 
     loadUser();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (mounted) setUserId(session?.user?.id || null);
+      if (mounted) setActiveUser(session?.user?.id || null);
     });
 
     return () => {
@@ -39,19 +60,22 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!userId) {
-      setThemeState('system');
       return;
     }
 
-    const saved = localStorage.getItem(getThemeStorageKey(userId));
-    setThemeState(saved === 'light' || saved === 'dark' || saved === 'system' ? saved : 'system');
+    try {
+      const saved = localStorage.getItem(getThemeStorageKey(userId));
+      setThemeState(saved === 'light' || saved === 'dark' || saved === 'system' ? saved : 'system');
+    } catch {
+      setThemeState('system');
+    }
   }, [userId]);
 
   const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>('light');
 
   useEffect(() => {
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    
+
     const applyTheme = () => {
       let active: 'light' | 'dark' = 'light';
       if (theme === 'system') {
@@ -59,16 +83,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       } else {
         active = theme;
       }
-      
+
       setResolvedTheme(active);
-      
-      if (active === 'dark') {
-        document.documentElement.classList.add('dark');
-        document.documentElement.style.colorScheme = 'dark';
-      } else {
-        document.documentElement.classList.remove('dark');
-        document.documentElement.style.colorScheme = 'light';
-      }
+      applyResolvedTheme(active);
     };
 
     applyTheme();
@@ -85,8 +102,17 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   const setTheme = (mode: ThemeMode) => {
     setThemeState(mode);
+    const active = mode === 'system'
+      ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+      : mode;
+    setResolvedTheme(active);
+    applyResolvedTheme(active);
     if (userId) {
-      localStorage.setItem(getThemeStorageKey(userId), mode);
+      try {
+        localStorage.setItem(getThemeStorageKey(userId), mode);
+      } catch {
+        // The current selection still applies for this session.
+      }
     }
   };
 

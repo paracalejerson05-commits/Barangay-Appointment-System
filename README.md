@@ -27,6 +27,8 @@ See `.env.example` for variable names and placeholder formats. The local `.env` 
 
 Run the applicable SQL migrations in the Supabase SQL Editor before using registration, resident document review, or the related approval workflow. In particular, apply `database_resident_registration.sql`.
 
+`database_security_phase2.sql` is a review-only proposal for order, request-state, announcement, profile, and view access controls. It has not been applied. Review and test it in a staging environment after `database_security_hardening.sql`, `database_security_fix.sql`, and `database_resident_registration.sql` are in place; verify actual policies and grants before production rollout.
+
 ## Local checks
 
 - `npm run lint` checks TypeScript.

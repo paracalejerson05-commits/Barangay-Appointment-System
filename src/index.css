@@ -7,15 +7,46 @@
 
 @variant dark (&:where(.dark, .dark *));
 
+:root {
+  color-scheme: light;
+  --app-background: #f4f7fb;
+  --app-surface: #ffffff;
+  --app-surface-muted: #f8fafc;
+  --app-surface-hover: #eff6ff;
+  --app-text: #0f172a;
+  --app-text-secondary: #475569;
+  --app-text-muted: #64748b;
+  --app-border: #e2e8f0;
+  --app-accent: #2563eb;
+}
+
+html.dark {
+  color-scheme: dark;
+  --app-background: #0b1120;
+  --app-surface: #172033;
+  --app-surface-muted: #1e293b;
+  --app-surface-hover: #263449;
+  --app-text: #f8fafc;
+  --app-text-secondary: #cbd5e1;
+  --app-text-muted: #94a3b8;
+  --app-border: #334155;
+  --app-accent: #60a5fa;
+}
+
 html {
+  background-color: var(--app-background);
   transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 body {
   font-family: 'Manrope', sans-serif;
-  background-color: #F4F7FB;
-  color: #111827;
+  background-color: var(--app-background);
+  color: var(--app-text);
   overflow-x: hidden;
+}
+
+html.dark #root {
+  color: var(--app-text);
 }
 
 @media (max-width: 1023px) {
@@ -255,32 +286,272 @@ html.dark .mobile-nav {
   flex-shrink: 0;
 }
 
-html.dark .auth-page .auth-card .text-slate-900 {
-  color: #0f172a !important;
-}
-
-html.dark .auth-page .auth-card .text-slate-700 {
-  color: #334155 !important;
-}
-
-html.dark .auth-page .auth-card .text-slate-600 {
-  color: #475569 !important;
-}
-
-html.dark .auth-page .auth-card .text-slate-500 {
-  color: #64748b !important;
-}
-
-html.dark .auth-page .auth-card .text-slate-400 {
-  color: #64748b !important;
-}
-
-html.dark .auth-page .auth-card .border-slate-100 {
-  border-color: #e2e8f0 !important;
+html.dark .auth-page .auth-card {
+  border-color: #334155;
+  background: rgb(23 32 51 / 96%);
+  box-shadow: 0 24px 64px rgb(2 6 23 / 40%), inset 0 1px rgb(255 255 255 / 5%);
 }
 
 html.dark .auth-page .auth-card input:not([type='checkbox']) {
-  background: #f8fafc !important;
+  border-color: #475569;
+  background: #1e293b;
+  color: #f8fafc !important;
+}
+
+html.dark .auth-page .auth-card input:not([type='checkbox'])::placeholder {
+  color: #94a3b8;
+}
+
+html.dark .auth-page .auth-card input:not([type='checkbox']):focus {
+  background: #263449;
+}
+
+html.dark .auth-page .auth-card .auth-google-button {
+  border-color: #475569;
+  background: #1e293b;
+  color: #f8fafc;
+}
+
+html.dark .auth-page .auth-card .auth-google-button:hover:not(:disabled) {
+  background: #263449;
+}
+
+html.dark #root [class~="bg-white"],
+html.dark #root [class~="bg-[#FCFDFE]"] {
+  background-color: var(--app-surface) !important;
+}
+
+html.dark #root :is(
+  [class~="bg-[#F8FAFC]"],
+  [class~="bg-[#F7F9FC]"],
+  [class~="bg-[#F4F7FB]"],
+  [class~="bg-[#F4F7F9]"],
+  [class~="bg-[#F1F5F9]"],
+  [class~="bg-[#E5E7EB]"],
+  [class~="bg-[#E2E8F0]"],
+  [class~="bg-gray-50"],
+  [class~="bg-gray-100"],
+  [class~="bg-slate-50"],
+  [class~="bg-slate-100"],
+  [class~="bg-slate-200"],
+  [class~="bg-neutral-100"]
+) {
+  background-color: var(--app-surface-muted) !important;
+}
+
+html.dark #root :is(
+  [class~="hover:bg-white"],
+  [class~="hover:bg-gray-50"],
+  [class~="hover:bg-slate-50"],
+  [class~="hover:bg-[#F8FAFC]"],
+  [class~="hover:bg-[#F4F7FB]"],
+  [class~="hover:bg-[#F1F5F9]"],
+  [class~="hover:bg-[#EFF6FF]"],
+  [class~="hover:bg-blue-50"]
+):hover {
+  background-color: var(--app-surface-hover) !important;
+}
+
+html.dark #root :is(
+  [class~="bg-amber-50/20"],
+  [class~="bg-amber-50/50"],
+  [class~="bg-amber-50/60"],
+  [class~="bg-amber-50/70"],
+  [class~="bg-amber-50/80"],
+  [class~="bg-amber-100/80"]
+) {
+  background-color: #3a2a12 !important;
+}
+
+html.dark #root :is(
+  [class~="bg-blue-50/40"],
+  [class~="bg-blue-50/50"],
+  [class~="bg-blue-50/70"],
+  [class~="bg-blue-50/80"],
+  [class~="bg-blue-100/70"]
+) {
+  background-color: #172b4d !important;
+}
+
+html.dark #root :is([class~="bg-emerald-50/70"]) {
+  background-color: #12352c !important;
+}
+
+html.dark #root :is([class~="bg-red-50/70"], [class~="bg-rose-50"]) {
+  background-color: #3b2027 !important;
+}
+
+html.dark #root :is(
+  [class~="bg-slate-50/70"],
+  [class~="bg-slate-50/80"]
+) {
+  background-color: var(--app-surface-muted) !important;
+}
+
+html.dark #root :is(
+  [class~="bg-[#EFF6FF]"],
+  [class~="bg-[#E4EEFC]"],
+  [class~="bg-blue-50"],
+  [class~="bg-blue-100"]
+) {
+  background-color: #172b4d !important;
+}
+
+html.dark #root :is([class~="bg-amber-50"], [class~="bg-amber-100"]) {
+  background-color: #3a2a12 !important;
+}
+
+html.dark #root :is([class~="bg-emerald-50"], [class~="bg-emerald-100"], [class~="bg-green-50"]) {
+  background-color: #12352c !important;
+}
+
+html.dark #root :is([class~="bg-red-50"], [class~="bg-red-100"], [class~="bg-rose-50"]) {
+  background-color: #3b2027 !important;
+}
+
+html.dark #root :is(
+  [class~="text-[#0F172A]"],
+  [class~="text-[#111827]"],
+  [class~="text-[#1E293B]"],
+  [class~="text-[#26364A]"],
+  [class~="text-slate-900"],
+  [class~="text-slate-800"],
+  [class~="text-gray-900"],
+  [class~="text-gray-800"],
+  [class~="text-black"]
+) {
+  color: var(--app-text) !important;
+}
+
+html.dark #root :is(
+  [class~="text-[#334155]"],
+  [class~="text-[#475569]"],
+  [class~="text-slate-700"],
+  [class~="text-slate-600"],
+  [class~="text-gray-700"],
+  [class~="text-gray-600"]
+) {
+  color: var(--app-text-secondary) !important;
+}
+
+html.dark #root :is(
+  [class~="text-[#64748B]"],
+  [class~="text-[#6B7280]"],
+  [class~="text-[#718096]"],
+  [class~="text-[#7B8BA1]"],
+  [class~="text-[#8291A6]"],
+  [class~="text-[#94A3B8]"],
+  [class~="text-slate-500"],
+  [class~="text-gray-500"]
+) {
+  color: var(--app-text-muted) !important;
+}
+
+html.dark #root :is(
+  [class~="text-[#15418C]"],
+  [class~="text-[#1e3a8a]"],
+  [class~="text-blue-900"],
+  [class~="text-blue-800"],
+  [class~="text-blue-700"],
+  [class~="text-[#1D4ED8]"]
+) {
+  color: #93c5fd !important;
+}
+
+html.dark #root :is(
+  [class~="text-emerald-900"],
+  [class~="text-emerald-800"],
+  [class~="text-emerald-700"],
+  [class~="text-emerald-600"]
+) {
+  color: #6ee7b7 !important;
+}
+
+html.dark #root :is(
+  [class~="text-amber-900"],
+  [class~="text-amber-800"],
+  [class~="text-amber-700"],
+  [class~="text-amber-600"]
+) {
+  color: #fcd34d !important;
+}
+
+html.dark #root :is(
+  [class~="text-red-900"],
+  [class~="text-red-800"],
+  [class~="text-red-700"],
+  [class~="text-red-600"],
+  [class~="text-rose-700"]
+) {
+  color: #fca5a5 !important;
+}
+
+html.dark #root [class~="bg-gradient-to-r"] {
+  background-image: linear-gradient(to right, #1e3a5f, #263449) !important;
+}
+
+html.dark #root :is(
+  [class~="border-blue-100"],
+  [class~="border-blue-200"],
+  [class~="border-blue-300"],
+  [class~="border-emerald-100"],
+  [class~="border-emerald-200"],
+  [class~="border-amber-100"],
+  [class~="border-amber-200"],
+  [class~="border-amber-300"],
+  [class~="border-red-100"],
+  [class~="border-red-200"],
+  [class~="border-rose-200"]
+) {
+  border-color: #475569 !important;
+}
+
+html.dark #root :is([class~="border-[#E2E8F0]"], [class~="border-[#E5E7EB]"], [class~="border-[#E8EEF6]"], [class~="border-[#DCE6F2]"], [class~="border-[#F1F5F9]"], [class~="border-slate-100"], [class~="border-slate-200"], [class~="border-slate-300"], [class~="divide-[#E5E7EB]"], [class~="divide-[#F1F5F9]"], [class~="divide-slate-100"]) {
+  border-color: var(--app-border) !important;
+}
+
+html.dark #root :is(
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
+  select,
+  textarea
+) {
+  color-scheme: dark;
+  border-color: #475569;
+  background-color: var(--app-surface-muted);
+  color: var(--app-text);
+}
+
+html.dark #root :is(input, textarea)::placeholder {
+  color: #94a3b8;
+  opacity: 1;
+}
+
+html.dark #root :is(input, select, textarea):focus-visible {
+  outline-color: #60a5fa;
+}
+
+html.dark #root .recharts-cartesian-axis-tick-value {
+  fill: #cbd5e1 !important;
+}
+
+html.dark #root .recharts-cartesian-grid line {
+  stroke: #334155 !important;
+}
+
+html.dark #root .recharts-default-tooltip {
+  border-color: #334155 !important;
+  background-color: #111827 !important;
+  color: #f8fafc !important;
+}
+
+.certificate-preview-page {
+  color-scheme: light;
+}
+
+.certificate-preview-page,
+.certificate-preview-page * {
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
 }
 
 @media (max-width: 767px) {
@@ -517,68 +788,6 @@ textarea {
   .min-h-\[44px\] {
     min-height: 44px;
   }
-}
-
-html.dark body {
-  background-color: #0B132B;
-  color: #F8FAFC;
-}
-
-/* Keep legacy dashboard utility classes readable when dark mode is enabled. */
-html.dark [class~="bg-white"] {
-  background-color: #111827 !important;
-}
-
-html.dark [class~="bg-[#F8FAFC]"] {
-  background-color: #1E293B !important;
-}
-
-html.dark [class~="bg-[#F4F7F9]"] {
-  background-color: #0B132B !important;
-}
-
-html.dark [class~="bg-[#F1F5F9]"] {
-  background-color: #1E293B !important;
-}
-
-html.dark [class~="text-[#0F172A]"] {
-  color: #F8FAFC !important;
-}
-
-html.dark [class~="text-[#111827]"] {
-  color: #F8FAFC !important;
-}
-
-html.dark [class~="text-[#64748B]"] {
-  color: #CBD5E1 !important;
-}
-
-html.dark [class~="text-slate-500"] {
-  color: #94A3B8 !important;
-}
-
-html.dark [class~="text-slate-600"] {
-  color: #CBD5E1 !important;
-}
-
-html.dark [class~="text-slate-700"] {
-  color: #E2E8F0 !important;
-}
-
-html.dark [class~="text-slate-900"] {
-  color: #F8FAFC !important;
-}
-
-html.dark [class~="border-[#E2E8F0]"],
-html.dark [class~="border-slate-200"],
-html.dark [class~="border-slate-100"] {
-  border-color: #334155 !important;
-}
-
-html.dark [class~="hover:bg-[#F8FAFC]"]:hover,
-html.dark [class~="hover:bg-[#F1F5F9]"]:hover,
-html.dark [class~="hover:bg-slate-50"]:hover {
-  background-color: #334155 !important;
 }
 
 html.dark .schedule-manager .schedule-card {

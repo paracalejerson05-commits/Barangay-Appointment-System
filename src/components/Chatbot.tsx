@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import ReactMarkdown from 'react-markdown';
 import { cn } from '../lib/utils';
 import { apiUrl } from '../lib/api';
+import { supabase } from '../lib/supabase';
 
 interface Message {
   role: 'user' | 'model';
@@ -54,14 +55,21 @@ export function Chatbot({ onClose, user, profile }: ChatbotProps) {
         return;
       }
 
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        throw new Error('Your session has expired. Please sign in again.');
+      }
+
       const response = await fetch(apiUrl('/api/chat'), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        credentials: 'omit',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`
+        },
         body: JSON.stringify({
           message: userMessage,
-          conversationHistory: messages,
-          userId: user?.uid || user?.id || '',
-          role: isAdmin ? 'admin' : 'resident'
+          conversationHistory: messages
         })
       });
 

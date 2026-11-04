@@ -3,6 +3,25 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      (() => {
+        let preference = 'system';
+        try {
+          const authKey = Object.keys(localStorage).find((key) => /^sb-.+-auth-token$/.test(key));
+          const auth = authKey ? JSON.parse(localStorage.getItem(authKey) || 'null') : null;
+          const userId = auth?.user?.id || auth?.currentSession?.user?.id;
+          const saved = userId ? localStorage.getItem(`app_theme_${userId}`) : null;
+          if (saved === 'light' || saved === 'dark' || saved === 'system') preference = saved;
+        } catch {
+          preference = 'system';
+        }
+        const dark = preference === 'dark'
+          || (preference === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.classList.toggle('dark', dark);
+        document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
+        document.documentElement.style.backgroundColor = dark ? '#0B1120' : '#F4F7FB';
+      })();
+    </script>
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=UnifrakturMaguntia&display=swap" rel="stylesheet">
     <title>Barangay Pupua Portal</title>

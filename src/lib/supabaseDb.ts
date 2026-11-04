@@ -351,14 +351,15 @@ export async function dbGetAnnouncements() {
 export async function dbSaveAnnouncement(ann: { id?: string; title: string; content: string; category?: string; status?: string; visibility?: string }) {
   if (!isSupabaseConfigured) return null;
   if (ann.id) {
-    const { error } = await supabase.from('announcements').update({
+    const { data, error } = await supabase.from('announcements').update({
       title: ann.title,
       content: ann.content,
-      category: ann.category,
-      status: ann.status,
-      visibility: ann.visibility
-    }).eq('id', ann.id);
-    if (error) return null;
+      category: ann.category || 'General',
+      status: ann.status || 'Published',
+      updated_at: new Date().toISOString()
+    }).eq('id', ann.id).select('id').maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!data) throw new Error('The announcement could not be found.');
     return ann.id;
   } else {
     const { data, error } = await supabase.from('announcements').insert([{
@@ -366,12 +367,30 @@ export async function dbSaveAnnouncement(ann: { id?: string; title: string; cont
       content: ann.content,
       category: ann.category || 'General',
       status: ann.status || 'Published',
-      visibility: ann.visibility || 'Public',
       created_at: new Date().toISOString()
     }]).select();
-    if (error) return null;
-    return data?.[0]?.id || null;
+    if (error) throw new Error(error.message);
+    if (!data?.[0]?.id) throw new Error('The announcement was not returned after saving.');
+    return data[0].id;
   }
+}
+
+export async function dbNotifyResidentsOfAnnouncement(announcementId: string): Promise<number> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) {
+    throw new Error('Your session has expired. Please sign in again.');
+  }
+
+  const response = await fetch(apiUrl(`/api/announcements/${encodeURIComponent(announcementId)}/notify`), {
+    method: 'POST',
+    credentials: 'omit',
+    headers: { Authorization: `Bearer ${session.access_token}` }
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(result.error || `Resident notifications failed with HTTP ${response.status}.`);
+  }
+  return Number(result.notifiedCount) || 0;
 }
 
 export async function dbDeleteAnnouncement(id: string) {

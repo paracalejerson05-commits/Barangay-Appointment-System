@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   AlertCircle,
-  Calendar,
   CalendarDays,
   CheckCircle2,
   ChevronDown,
@@ -16,7 +15,7 @@ import {
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { syncSpecialDatesToSupabase } from '../lib/supabaseSync';
-import { dbGetSchedule, dbSaveSchedule, dbGetAnnouncements, dbSaveAnnouncement, dbDeleteAnnouncement } from '../lib/supabaseDb';
+import { dbGetSchedule, dbSaveSchedule, dbGetAnnouncements, dbSaveAnnouncement, dbNotifyResidentsOfAnnouncement, dbDeleteAnnouncement } from '../lib/supabaseDb';
 
 const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] as const;
 const DEFAULT_WEEKLY_SCHEDULE = {
@@ -37,7 +36,7 @@ type AnnouncementDraft = {
   category: string;
   status: string;
 };
-type SectionName = 'weekly' | 'capacity' | 'specialDates' | 'announcements';
+type SectionName = 'weekly' | 'capacity' | 'announcements';
 
 const makeSnapshot = (weekly: unknown, specialDates: SpecialDate[], capacity: string) =>
   JSON.stringify({ weekly, specialDates, maxCapacityPerSlot: Number(capacity) });
@@ -52,15 +51,6 @@ function isValidDate(value: string): boolean {
 function isValidTime(value: string): boolean {
   if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(value)) return false;
   return true;
-}
-
-function displayDate(value: string): string {
-  if (!isValidDate(value)) return value;
-  return new Date(`${value}T12:00:00`).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric'
-  });
 }
 
 function Section({
@@ -112,23 +102,20 @@ export function ScheduleManager() {
   const [schedule, setSchedule] = useState<any>(DEFAULT_WEEKLY_SCHEDULE);
   const [maxCapacityPerSlot, setMaxCapacityPerSlot] = useState('5');
   const [specialDates, setSpecialDates] = useState<SpecialDate[]>([]);
-  const [newSpecialDate, setNewSpecialDate] = useState<SpecialDate>({ date: '', closed: true, start: '08:00', end: '12:00' });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [capacityError, setCapacityError] = useState('');
-  const [specialDateError, setSpecialDateError] = useState('');
   const [announcementError, setAnnouncementError] = useState('');
+  const [announcementFeedback, setAnnouncementFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [announcements, setAnnouncements] = useState<any[]>([]);
   const [expandedSections, setExpandedSections] = useState<Record<SectionName, boolean>>({
     weekly: true,
     capacity: false,
-    specialDates: false,
     announcements: false
   });
   const [isAnnouncementModalOpen, setIsAnnouncementModalOpen] = useState(false);
-  const [isSpecialDateModalOpen, setIsSpecialDateModalOpen] = useState(false);
   const [announcementSaving, setAnnouncementSaving] = useState(false);
   const [currentAnnouncement, setCurrentAnnouncement] = useState<AnnouncementDraft>({
     title: '',
@@ -270,6 +257,7 @@ export function ScheduleManager() {
 
   const openAnnouncement = (announcement?: any) => {
     setAnnouncementError('');
+    setAnnouncementFeedback(null);
     setCurrentAnnouncement(announcement ? {
       id: announcement.id,
       title: announcement.title || '',
@@ -287,14 +275,34 @@ export function ScheduleManager() {
     }
     setAnnouncementSaving(true);
     setAnnouncementError('');
+    setAnnouncementFeedback(null);
     try {
       const savedId = await dbSaveAnnouncement(currentAnnouncement);
       if (!savedId) throw new Error('The announcement was not saved.');
       await refreshAnnouncements();
       setIsAnnouncementModalOpen(false);
+      setAnnouncementFeedback({ type: 'success', text: 'Announcement saved successfully.' });
+      if (currentAnnouncement.status === 'Published') {
+        try {
+          const notifiedCount = await dbNotifyResidentsOfAnnouncement(savedId);
+          setAnnouncementFeedback({
+            type: 'success',
+            text: `Announcement saved and residents notified (${notifiedCount}).`
+          });
+        } catch (notificationError) {
+          console.error('Error notifying residents about announcement:', notificationError);
+          const reason = notificationError instanceof Error ? notificationError.message : 'Unknown notification error.';
+          setAnnouncementFeedback({
+            type: 'error',
+            text: `Announcement saved, but resident notifications could not be sent: ${reason}`
+          });
+        }
+      }
     } catch (error) {
       console.error('Error saving announcement:', error);
-      setAnnouncementError('Could not save the announcement. Please try again.');
+      setAnnouncementError(error instanceof Error
+        ? `Could not save the announcement: ${error.message}`
+        : 'Could not save the announcement. Please try again.');
     } finally {
       setAnnouncementSaving(false);
     }
@@ -311,29 +319,6 @@ export function ScheduleManager() {
     }
   };
 
-  const addSpecialDate = () => {
-    setSpecialDateError('');
-    if (!isValidDate(newSpecialDate.date)) {
-      setSpecialDateError('Choose a valid calendar date.');
-      return;
-    }
-    if (specialDates.some(item => item.date === newSpecialDate.date)) {
-      setSpecialDateError('A special date already exists for this date.');
-      return;
-    }
-    if (!newSpecialDate.closed && (!isValidTime(newSpecialDate.start) || !isValidTime(newSpecialDate.end) || newSpecialDate.start >= newSpecialDate.end)) {
-      setSpecialDateError('Custom hours must be valid and the end time must be later than the start.');
-      return;
-    }
-    setSpecialDates(current => [...current, newSpecialDate].sort((a, b) => a.date.localeCompare(b.date)));
-    setNewSpecialDate({ date: '', closed: true, start: '08:00', end: '12:00' });
-    setIsSpecialDateModalOpen(false);
-  };
-
-  const removeSpecialDate = (date: string) => {
-    setSpecialDates(current => current.filter(item => item.date !== date));
-  };
-
   if (loading) {
     return <div className="flex items-center justify-center p-8"><Loader2 className="h-6 w-6 animate-spin text-blue-600" /></div>;
   }
@@ -345,7 +330,7 @@ export function ScheduleManager() {
     <div className="schedule-manager space-y-3 sm:space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-blue-100/80 pb-3">
         <p className="max-w-2xl text-[13px] leading-5 text-[#64748B] sm:text-sm">
-          Manage office hours, special dates, capacity settings, and public announcements.
+          Manage office hours, capacity settings, and public announcements.
         </p>
         <div className="ml-auto flex items-center gap-2">
           <span role="status" aria-live="polite" className="hidden text-xs font-medium text-[#64748B] sm:inline">
@@ -474,58 +459,6 @@ export function ScheduleManager() {
         </Section>
 
         <Section
-          id="specialDates"
-          title="Special Dates & Holidays"
-          description={`${specialDates.length} saved ${specialDates.length === 1 ? 'date' : 'dates'}; these override weekly hours.`}
-          icon={Calendar}
-          expanded={expandedSections.specialDates}
-          onToggle={() => toggleSection('specialDates')}
-        >
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <p className="text-xs leading-5 text-[#64748B]">A special date takes precedence over the regular weekly schedule.</p>
-            <button
-              type="button"
-              onClick={() => {
-                setSpecialDateError('');
-                setNewSpecialDate({ date: '', closed: true, start: '08:00', end: '12:00' });
-                setIsSpecialDateModalOpen(true);
-              }}
-              className="inline-flex min-h-10 items-center gap-1.5 rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white transition hover:bg-blue-700"
-            >
-              <Plus className="h-4 w-4" /> Add Special Date
-            </button>
-          </div>
-          {specialDates.length === 0 ? (
-            <p className="rounded-lg bg-slate-50 px-3 py-3 text-sm text-[#64748B]">No special dates configured.</p>
-          ) : (
-            <ul className="space-y-2">
-              {specialDates.map(item => (
-                <li key={item.date} className="flex min-w-0 items-center justify-between gap-3 rounded-lg border border-slate-100 bg-slate-50/70 px-3 py-2.5">
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-[#0F172A]">{displayDate(item.date)}</p>
-                    {item.closed ? (
-                      <span className="mt-1 inline-flex rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800">Closed / Holiday</span>
-                    ) : (
-                      <span className="mt-1 inline-flex rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-800">
-                        Custom hours · {item.start}–{item.end}
-                      </span>
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => removeSpecialDate(item.date)}
-                    aria-label={`Remove special date ${displayDate(item.date)}`}
-                    className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg text-slate-500 transition hover:bg-red-50 hover:text-red-700"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Section>
-
-        <Section
           id="announcements"
           title="Announcements"
           description={`${announcements.length} saved ${announcements.length === 1 ? 'announcement' : 'announcements'}.`}
@@ -543,6 +476,19 @@ export function ScheduleManager() {
               <Plus className="h-4 w-4" /> New Announcement
             </button>
           </div>
+          {announcementFeedback && (
+            <p
+              role={announcementFeedback.type === 'error' ? 'alert' : 'status'}
+              className={cn(
+                'mb-3 rounded-lg border px-3 py-2 text-sm',
+                announcementFeedback.type === 'success'
+                  ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                  : 'border-red-200 bg-red-50 text-red-700'
+              )}
+            >
+              {announcementFeedback.text}
+            </p>
+          )}
           {announcementError && <p role="alert" className="mb-2 text-sm text-red-700">{announcementError}</p>}
           {announcements.length === 0 ? (
             <div className="rounded-lg border border-dashed border-blue-200 bg-slate-50 px-3 py-4 text-center">
@@ -589,55 +535,6 @@ export function ScheduleManager() {
           )}
         </Section>
       </div>
-
-      {isSpecialDateModalOpen && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/50 p-3" role="presentation" onMouseDown={event => {
-          if (event.target === event.currentTarget) setIsSpecialDateModalOpen(false);
-        }}>
-          <div role="dialog" aria-modal="true" aria-labelledby="special-date-title" className="w-full max-w-md rounded-xl border border-blue-200 bg-white shadow-2xl">
-            <div className="flex items-center justify-between border-b border-blue-100 px-4 py-3">
-              <h3 id="special-date-title" className="text-base font-bold text-[#0F172A]">Add Special Date</h3>
-              <button type="button" onClick={() => setIsSpecialDateModalOpen(false)} aria-label="Close special date form" className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            <div className="space-y-3 p-4">
-              <label className="block space-y-1 text-sm font-semibold text-[#0F172A]">
-                <span>Date</span>
-                <input type="date" value={newSpecialDate.date} onChange={event => setNewSpecialDate(current => ({ ...current, date: event.target.value }))} className={compactFieldClass} />
-              </label>
-              <label className="block space-y-1 text-sm font-semibold text-[#0F172A]">
-                <span>Status</span>
-                <select
-                  value={newSpecialDate.closed ? 'closed' : 'custom'}
-                  onChange={event => setNewSpecialDate(current => ({ ...current, closed: event.target.value === 'closed' }))}
-                  className={compactFieldClass}
-                >
-                  <option value="closed">Closed (Holiday)</option>
-                  <option value="custom">Custom Hours</option>
-                </select>
-              </label>
-              {!newSpecialDate.closed && (
-                <div className="grid grid-cols-2 gap-3">
-                  <label className="block space-y-1 text-sm font-semibold text-[#0F172A]">
-                    <span>Start</span>
-                    <input type="time" value={newSpecialDate.start} onChange={event => setNewSpecialDate(current => ({ ...current, start: event.target.value }))} className={compactFieldClass} />
-                  </label>
-                  <label className="block space-y-1 text-sm font-semibold text-[#0F172A]">
-                    <span>End</span>
-                    <input type="time" value={newSpecialDate.end} onChange={event => setNewSpecialDate(current => ({ ...current, end: event.target.value }))} className={compactFieldClass} />
-                  </label>
-                </div>
-              )}
-              {specialDateError && <p role="alert" className="text-sm text-red-700">{specialDateError}</p>}
-            </div>
-            <div className="flex justify-end gap-2 border-t border-blue-100 bg-slate-50 px-4 py-3">
-              <button type="button" onClick={() => setIsSpecialDateModalOpen(false)} className="min-h-10 rounded-lg px-3 text-sm font-semibold text-slate-600 hover:bg-slate-200">Cancel</button>
-              <button type="button" onClick={addSpecialDate} className="min-h-10 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700">Add Date</button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {isAnnouncementModalOpen && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/50 p-3" role="presentation" onMouseDown={event => {

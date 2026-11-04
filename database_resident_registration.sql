@@ -48,7 +48,14 @@ AS $$
 DECLARE
   is_authenticated_resident boolean := auth.uid() IS NOT NULL AND NOT public.is_admin();
   is_auth_provisioned_profile boolean := false;
+  is_rejection_status_update boolean := false;
 BEGIN
+  IF TG_OP = 'UPDATE' THEN
+    is_rejection_status_update :=
+      NEW.status = 'inactive'
+      AND NEW.status IS DISTINCT FROM OLD.status;
+  END IF;
+
   is_auth_provisioned_profile :=
     TG_OP = 'INSERT'
     AND auth.uid() IS NULL
@@ -84,7 +91,9 @@ BEGIN
     END IF;
   END IF;
 
-  IF NEW.role = 'resident' AND NOT is_auth_provisioned_profile THEN
+  IF NEW.role = 'resident'
+    AND NOT is_auth_provisioned_profile
+    AND NOT is_rejection_status_update THEN
     IF coalesce(trim(NEW.display_name), '') = ''
       OR NEW.date_of_birth IS NULL
       OR NEW.date_of_birth > current_date
