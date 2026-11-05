@@ -19,9 +19,11 @@ Set these in the hosting provider dashboards; never commit real values:
 - `SUPABASE_KEY`
 - `SUPABASE_SECRET_KEY`
 
-Optional API integrations use `GEMINI_API_KEY`, `SMTP_EMAIL`, and `SMTP_PASSWORD`.
+Set `GEMINI_API_KEY` in Vercel's server environment variables to enable Gemini. Keep it server-only: never prefix it with `VITE_` or commit its value. Without the key or when Gemini is unavailable, the authenticated chatbot uses its limited verified-information fallback. `SMTP_EMAIL` and `SMTP_PASSWORD` are optional email integration variables.
 
 See `.env.example` for variable names and placeholder formats. The local `.env` file must remain untracked.
+
+In Supabase Authentication URL Configuration, allow the deployed app origin as a redirect URL (and the local development origin when testing). Password recovery redirects to `/?auth_mode=recovery` on the current origin; Supabase must permit that origin for the recovery email link to return to the app.
 
 ## Database setup
 
@@ -34,3 +36,4 @@ Run the applicable SQL migrations in the Supabase SQL Editor before using regist
 - `npm run lint` checks TypeScript.
 - `npm run build:web` builds only the Vercel frontend.
 - `npm run build` builds the frontend and Express server bundle.
+- `node --import tsx --test src/lib/chatReliability.test.ts` runs the chatbot reliability tests.

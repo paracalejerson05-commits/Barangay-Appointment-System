@@ -15,7 +15,7 @@ import {
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { BARANGAY_LOGO_URL, BARANGAY_LOGO_FALLBACK, SYSTEM_NAME } from '../constants';
-import { supabase, isSupabaseConfigured } from '../supabaseClient';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { dbAddNotification, dbGetUserById } from '../lib/supabaseDb';
 import { ResidentRegistrationForm, ResidentRegistrationSubmission } from './ResidentRegistrationForm';
 import { apiUrl } from '../lib/api';
@@ -26,16 +26,21 @@ interface AuthProps {
   registrationUser?: any;
   existingProfile?: any;
   pendingApprovalEmail?: string;
+  passwordRecovery?: boolean;
+  onPasswordRecoveryExit?: () => void;
 }
 
-type AuthMode = 'login' | 'signup' | 'forgot-password' | 'complete-profile';
+type AuthMode = 'login' | 'signup' | 'forgot-password' | 'complete-profile' | 'update-password';
 
 function getOAuthCallbackError() {
   if (typeof window === 'undefined') return null;
   const query = new URLSearchParams(window.location.search);
   const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
-  const errorCode = query.get('error') || hash.get('error');
+  const errorCode = query.get('error') || hash.get('error') || query.get('error_code') || hash.get('error_code');
   if (!errorCode) return null;
+  if (errorCode === 'otp_expired') {
+    return 'This password reset link has expired or was already used. Request a new reset link.';
+  }
   return errorCode === 'access_denied'
     ? 'Social sign-in was cancelled. You can try again.'
     : 'Social sign-in could not be completed. Check the provider setup and try again.';
@@ -158,12 +163,22 @@ const GoogleSignInButton = ({
   </button>
 );
 
-export function Auth({ onAuthSuccess, registrationUser, existingProfile, pendingApprovalEmail }: AuthProps) {
+export function Auth({
+  onAuthSuccess,
+  registrationUser,
+  existingProfile,
+  pendingApprovalEmail,
+  passwordRecovery = false,
+  onPasswordRecoveryExit
+}: AuthProps) {
   const prefersReducedMotion = useReducedMotion();
   const googleOAuthAvailable = isSupabaseConfigured;
   const transitionStarted = useRef(false);
   const [flipDirection, setFlipDirection] = useState(1);
   const [mode, setMode] = useState<AuthMode>(() => {
+    if (passwordRecovery) {
+      return getOAuthCallbackError() ? 'forgot-password' : 'update-password';
+    }
     if (registrationUser) return 'complete-profile';
     if (pendingApprovalEmail) return 'login';
     if (typeof window === 'undefined') return 'login';
@@ -172,6 +187,7 @@ export function Auth({ onAuthSuccess, registrationUser, existingProfile, pending
       : 'login';
   });
   const [currentScreen, setCurrentScreen] = useState<'intro' | 'transitioning' | 'auth'>(() => {
+    if (passwordRecovery) return 'auth';
     if (registrationUser) return 'auth';
     if (pendingApprovalEmail) return 'auth';
     if (typeof window === 'undefined') return 'intro';
@@ -192,6 +208,7 @@ export function Auth({ onAuthSuccess, registrationUser, existingProfile, pending
   // States
   const [email, setEmail] = useState(pendingApprovalEmail || '');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
   
   // UI states
@@ -207,10 +224,22 @@ export function Auth({ onAuthSuccess, registrationUser, existingProfile, pending
   const registrationInProgress = useRef(false);
 
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).has('auth_mode')) {
+    const query = new URLSearchParams(window.location.search);
+    if (query.has('auth_mode')) {
       window.history.replaceState({}, '', window.location.pathname);
     }
   }, []);
+
+  useEffect(() => {
+    if (passwordRecovery) {
+      setCurrentScreen('auth');
+      setMode(getOAuthCallbackError() ? 'forgot-password' : 'update-password');
+      setError(getOAuthCallbackError());
+      setSuccessMessage(null);
+      return;
+    }
+    if (mode === 'update-password') setMode('login');
+  }, [passwordRecovery]);
 
   useEffect(() => {
     if (registrationUser) {
@@ -234,6 +263,7 @@ export function Auth({ onAuthSuccess, registrationUser, existingProfile, pending
   const resetForm = () => {
     setEmail('');
     setPassword('');
+    setConfirmPassword('');
     setError(null);
     setSuccessMessage(null);
   };
@@ -528,14 +558,82 @@ export function Auth({ onAuthSuccess, registrationUser, existingProfile, pending
     e.preventDefault();
     setIsLoading(true);
     setError(null);
+    setSuccessMessage(null);
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(String(email || '').trim(), {
-        redirectTo: window.location.origin
+        redirectTo: `${window.location.origin}/?auth_mode=recovery`
       });
       if (error) throw error;
-      setSuccessMessage('Password reset link sent to your email.');
+      setSuccessMessage('If an account exists for that email, password reset instructions will arrive shortly. Check your inbox and spam folder.');
     } catch (err: any) {
-      setError(err.message || 'Failed to send reset email.');
+      console.error('[Password Recovery] Could not request a reset email:', err?.message || 'unknown error');
+      setError('We could not send password reset instructions right now. Check your connection and try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleUpdatePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError(null);
+    setSuccessMessage(null);
+
+    if (password.length < 8) {
+      setError('Choose a password with at least 8 characters.');
+      setIsLoading(false);
+      return;
+    }
+    if (password !== confirmPassword) {
+      setError('The passwords do not match.');
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      const { error: updateError } = await supabase.auth.updateUser({ password });
+      if (updateError) {
+        if (/session.*missing|jwt.*expired|token.*expired|refresh token/i.test(updateError.message)) {
+          throw new Error('This password reset link is invalid or has expired. Request a new reset link.');
+        }
+        throw updateError;
+      }
+
+      const { error: signOutError } = await supabase.auth.signOut();
+      if (signOutError) {
+        console.error('[Password Recovery] Password changed but sign-out failed:', signOutError.message);
+        setSuccessMessage('Your password has been updated. Sign in with your new password to continue.');
+      } else {
+        setSuccessMessage('Your password has been updated. Sign in with your new password to continue.');
+      }
+      setPassword('');
+      setConfirmPassword('');
+      setMode('login');
+      onPasswordRecoveryExit?.();
+    } catch (err: any) {
+      console.error('[Password Recovery] Could not update password:', err?.message || 'unknown error');
+      setError(err instanceof Error && /password reset link/i.test(err.message)
+        ? err.message
+        : 'We could not update your password. The reset link may have expired; request a new one and try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleExitPasswordRecovery = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const { error: signOutError } = await supabase.auth.signOut();
+      if (signOutError) throw signOutError;
+      setPassword('');
+      setConfirmPassword('');
+      setMode('login');
+      setSuccessMessage(null);
+      onPasswordRecoveryExit?.();
+    } catch (err: any) {
+      console.error('[Password Recovery] Could not end the recovery session:', err?.message || 'unknown error');
+      setError('We could not safely end the reset session. Please refresh the page and request a new reset link if needed.');
     } finally {
       setIsLoading(false);
     }
@@ -599,12 +697,14 @@ export function Auth({ onAuthSuccess, registrationUser, existingProfile, pending
               {mode === 'login' && 'Welcome Back'}
               {mode === 'signup' && 'Create Resident Account'}
               {mode === 'forgot-password' && 'Reset Password'}
+              {mode === 'update-password' && 'Choose a New Password'}
               {mode === 'complete-profile' && 'Complete Resident Registration'}
             </h2>
             <p className="text-sm text-slate-500 mt-1">
               {mode === 'login' && 'Sign in to access your barangay portal'}
               {mode === 'signup' && 'Register as a resident of Barangay Pupua'}
               {mode === 'forgot-password' && 'Enter your email to receive recovery instructions'}
+              {mode === 'update-password' && 'Enter and confirm your new account password'}
               {mode === 'complete-profile' && 'Finish your profile and identity verification for administrator review'}
             </p>
             {mode === 'login' && (
@@ -780,8 +880,71 @@ export function Auth({ onAuthSuccess, registrationUser, existingProfile, pending
               <div className="text-center pt-4 border-t border-slate-100">
                 <button
                   type="button"
-                  onClick={() => { setMode('login'); resetForm(); }}
+                  onClick={() => {
+                    if (passwordRecovery) {
+                      void handleExitPasswordRecovery();
+                    } else {
+                      setMode('login');
+                      resetForm();
+                    }
+                  }}
                   className="text-xs font-bold text-slate-600 hover:text-slate-900 flex items-center justify-center gap-1 mx-auto"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  <span>Back to Sign In</span>
+                </button>
+              </div>
+            </form>
+          )}
+
+          {mode === 'update-password' && (
+            <form onSubmit={handleUpdatePassword} className="space-y-4">
+              <div>
+                <label htmlFor="new-password" className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  New Password
+                </label>
+                <input
+                  id="new-password"
+                  type="password"
+                  required
+                  minLength={8}
+                  autoComplete="new-password"
+                  value={password}
+                  onChange={event => setPassword(event.target.value)}
+                  placeholder="At least 8 characters"
+                  className="w-full h-11 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white transition-all"
+                />
+              </div>
+              <div>
+                <label htmlFor="confirm-new-password" className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Confirm New Password
+                </label>
+                <input
+                  id="confirm-new-password"
+                  type="password"
+                  required
+                  minLength={8}
+                  autoComplete="new-password"
+                  value={confirmPassword}
+                  onChange={event => setConfirmPassword(event.target.value)}
+                  placeholder="Enter your new password again"
+                  className="w-full h-11 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white transition-all"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full h-11 bg-blue-600 hover:bg-blue-700 active:scale-[0.99] text-white font-bold rounded-xl shadow-lg shadow-blue-600/20 transition-all flex items-center justify-center gap-2 text-sm disabled:opacity-70"
+              >
+                {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Key className="w-4 h-4" />}
+                <span>Update Password</span>
+              </button>
+              <div className="text-center pt-4 border-t border-slate-100">
+                <button
+                  type="button"
+                  disabled={isLoading}
+                  onClick={() => void handleExitPasswordRecovery()}
+                  className="text-xs font-bold text-slate-600 hover:text-slate-900 flex items-center justify-center gap-1 mx-auto disabled:opacity-60"
                 >
                   <ArrowLeft className="w-3.5 h-3.5" />
                   <span>Back to Sign In</span>

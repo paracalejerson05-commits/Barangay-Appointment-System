@@ -41,6 +41,12 @@ export default function App() {
   const [user, setUser] = useState<any>(null);
   const [userProfile, setUserProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [passwordRecovery, setPasswordRecovery] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    const query = new URLSearchParams(window.location.search);
+    const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+    return query.get('auth_mode') === 'recovery' || hash.get('type') === 'recovery';
+  });
 
   useEffect(() => {
     async function initAuth() {
@@ -107,7 +113,8 @@ export default function App() {
 
     initAuth();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'PASSWORD_RECOVERY') setPasswordRecovery(true);
       if (session?.user) {
         const authUser = session.user;
         if (hasSocialIdentity(authUser) && (!authUser.email || !(authUser.email_confirmed_at || authUser.confirmed_at))) {
@@ -192,6 +199,16 @@ export default function App() {
       && String(userProfile.verification_status || '').toLowerCase() === 'approved'
     )
   );
+
+  if (passwordRecovery) {
+    return (
+      <Auth
+        onAuthSuccess={handleAuthSuccess}
+        passwordRecovery
+        onPasswordRecoveryExit={() => setPasswordRecovery(false)}
+      />
+    );
+  }
 
   if (!user || !userProfile || needsResidentRegistration || residentApprovalPending) {
     return (
