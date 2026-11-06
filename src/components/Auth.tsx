@@ -20,6 +20,14 @@ import { dbAddNotification, dbGetUserById } from '../lib/supabaseDb';
 import { ResidentRegistrationForm, ResidentRegistrationSubmission } from './ResidentRegistrationForm';
 import { apiUrl } from '../lib/api';
 import { checkProfileCompletion } from '../lib/profileUtils';
+import {
+  getRecoverySecondsRemaining,
+  RECOVERY_MAX_ATTEMPTS,
+  RECOVERY_OTP_EXPIRY_MS,
+  RECOVERY_OTP_LENGTH,
+  RECOVERY_RESEND_COOLDOWN_MS,
+  sanitizeRecoveryOtp
+} from '../lib/passwordRecovery';
 
 interface AuthProps {
   onAuthSuccess: (user: any, profile: any) => void;
@@ -30,7 +38,7 @@ interface AuthProps {
   onPasswordRecoveryExit?: () => void;
 }
 
-type AuthMode = 'login' | 'signup' | 'forgot-password' | 'complete-profile' | 'update-password';
+type AuthMode = 'login' | 'signup' | 'forgot-password' | 'verify-recovery-otp' | 'complete-profile' | 'update-password';
 
 function getOAuthCallbackError() {
   if (typeof window === 'undefined') return null;
@@ -209,6 +217,12 @@ export function Auth({
   const [email, setEmail] = useState(pendingApprovalEmail || '');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [recoveryOtp, setRecoveryOtp] = useState('');
+  const [recoveryOtpExpiresAt, setRecoveryOtpExpiresAt] = useState<number | null>(null);
+  const [resendOtpAvailableAt, setResendOtpAvailableAt] = useState<number | null>(null);
+  const [recoverySeconds, setRecoverySeconds] = useState(0);
+  const [resendSeconds, setResendSeconds] = useState(0);
+  const [otpAttempts, setOtpAttempts] = useState(0);
   const [rememberMe, setRememberMe] = useState(false);
   
   // UI states
@@ -222,6 +236,7 @@ export function Auth({
   });
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const registrationInProgress = useRef(false);
+  const recoveryRequestInProgress = useRef(false);
 
   useEffect(() => {
     const query = new URLSearchParams(window.location.search);
@@ -240,6 +255,20 @@ export function Auth({
     }
     if (mode === 'update-password') setMode('login');
   }, [passwordRecovery]);
+
+  useEffect(() => {
+    if (mode !== 'verify-recovery-otp') return;
+    const updateCountdowns = () => {
+      const now = Date.now();
+      const otpRemaining = getRecoverySecondsRemaining(recoveryOtpExpiresAt, now);
+      setRecoverySeconds(otpRemaining);
+      setResendSeconds(getRecoverySecondsRemaining(resendOtpAvailableAt, now));
+      if (otpRemaining === 0) setRecoveryOtp('');
+    };
+    updateCountdowns();
+    const interval = window.setInterval(updateCountdowns, 1000);
+    return () => window.clearInterval(interval);
+  }, [mode, recoveryOtpExpiresAt, resendOtpAvailableAt]);
 
   useEffect(() => {
     if (registrationUser) {
@@ -264,6 +293,10 @@ export function Auth({
     setEmail('');
     setPassword('');
     setConfirmPassword('');
+    setRecoveryOtp('');
+    setRecoveryOtpExpiresAt(null);
+    setResendOtpAvailableAt(null);
+    setOtpAttempts(0);
     setError(null);
     setSuccessMessage(null);
   };
@@ -556,25 +589,115 @@ export function Auth({
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (recoveryRequestInProgress.current) return;
+    recoveryRequestInProgress.current = true;
     setIsLoading(true);
     setError(null);
     setSuccessMessage(null);
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(String(email || '').trim(), {
-        redirectTo: `${window.location.origin}/?auth_mode=recovery`
-      });
+      const { error } = await supabase.auth.resetPasswordForEmail(String(email || '').trim().toLowerCase());
       if (error) throw error;
-      setSuccessMessage('If an account exists for that email, password reset instructions will arrive shortly. Check your inbox and spam folder.');
+      const now = Date.now();
+      setRecoveryOtp('');
+      setOtpAttempts(0);
+      setRecoveryOtpExpiresAt(now + RECOVERY_OTP_EXPIRY_MS);
+      setResendOtpAvailableAt(now + RECOVERY_RESEND_COOLDOWN_MS);
+      setMode('verify-recovery-otp');
+      setSuccessMessage('If an account exists for that email, a 6-digit verification code will arrive shortly. Check your inbox and spam folder.');
     } catch (err: any) {
       console.error('[Password Recovery] Could not request a reset email:', err?.message || 'unknown error');
-      setError('We could not send password reset instructions right now. Check your connection and try again.');
+      setError(/rate limit|too many|429/i.test(String(err?.message || ''))
+        ? 'Please wait before requesting another code. Check your inbox for a recently sent code.'
+        : 'We could not send password reset instructions right now. Check your connection and try again.');
     } finally {
+      recoveryRequestInProgress.current = false;
+      setIsLoading(false);
+    }
+  };
+
+  const handleVerifyRecoveryOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (recoveryRequestInProgress.current) return;
+    const token = sanitizeRecoveryOtp(recoveryOtp);
+    if (recoverySeconds === 0) {
+      setError('This verification code has expired. Request a new code to continue.');
+      setRecoveryOtp('');
+      return;
+    }
+    if (otpAttempts >= RECOVERY_MAX_ATTEMPTS) {
+      setError('Too many incorrect codes. Request a new code to try again.');
+      return;
+    }
+    if (token.length !== RECOVERY_OTP_LENGTH) {
+      setError('Enter the 6-digit code from your email.');
+      return;
+    }
+
+    recoveryRequestInProgress.current = true;
+    setIsLoading(true);
+    setError(null);
+    setSuccessMessage(null);
+    try {
+      const { data, error: verifyError } = await supabase.auth.verifyOtp({
+        email: String(email || '').trim().toLowerCase(),
+        token,
+        type: 'recovery'
+      });
+      if (verifyError) throw verifyError;
+      if (!data.session) {
+        throw new Error('The verification did not create a password reset session.');
+      }
+
+      setRecoveryOtp('');
+      setPassword('');
+      setConfirmPassword('');
+      setMode('update-password');
+      setSuccessMessage('Email verified. Choose a new password.');
+    } catch (err: any) {
+      const nextAttempts = otpAttempts + 1;
+      setOtpAttempts(nextAttempts);
+      setRecoveryOtp('');
+      console.error('[Password Recovery] OTP verification failed:', err?.message || 'unknown error');
+      setError(recoverySeconds === 0
+        ? 'This verification code has expired. Request a new code to continue.'
+        : nextAttempts >= RECOVERY_MAX_ATTEMPTS
+          ? 'Too many incorrect codes. Request a new code to try again.'
+          : 'That code is invalid or expired. Check the email and try again.');
+    } finally {
+      recoveryRequestInProgress.current = false;
+      setIsLoading(false);
+    }
+  };
+
+  const handleResendRecoveryOtp = async () => {
+    if (recoveryRequestInProgress.current || isLoading || resendSeconds > 0) return;
+    recoveryRequestInProgress.current = true;
+    setIsLoading(true);
+    setError(null);
+    setSuccessMessage(null);
+    try {
+      const { error: resendError } = await supabase.auth.resetPasswordForEmail(String(email || '').trim().toLowerCase());
+      if (resendError) throw resendError;
+      const now = Date.now();
+      setRecoveryOtp('');
+      setOtpAttempts(0);
+      setRecoveryOtpExpiresAt(now + RECOVERY_OTP_EXPIRY_MS);
+      setResendOtpAvailableAt(now + RECOVERY_RESEND_COOLDOWN_MS);
+      setSuccessMessage('If an account exists for that email, a new verification code will arrive shortly. Use the most recently received code.');
+    } catch (err: any) {
+      console.error('[Password Recovery] Could not resend a reset OTP:', err?.message || 'unknown error');
+      setError(/rate limit|too many|429/i.test(String(err?.message || ''))
+        ? 'Please wait before requesting another code. Check your inbox for a recently sent code.'
+        : 'We could not resend the code right now. Check your connection and try again.');
+    } finally {
+      recoveryRequestInProgress.current = false;
       setIsLoading(false);
     }
   };
 
   const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (recoveryRequestInProgress.current) return;
     setIsLoading(true);
     setError(null);
     setSuccessMessage(null);
@@ -590,6 +713,7 @@ export function Auth({
       return;
     }
 
+    recoveryRequestInProgress.current = true;
     try {
       const { error: updateError } = await supabase.auth.updateUser({ password });
       if (updateError) {
@@ -602,13 +726,11 @@ export function Auth({
       const { error: signOutError } = await supabase.auth.signOut();
       if (signOutError) {
         console.error('[Password Recovery] Password changed but sign-out failed:', signOutError.message);
-        setSuccessMessage('Your password has been updated. Sign in with your new password to continue.');
-      } else {
-        setSuccessMessage('Your password has been updated. Sign in with your new password to continue.');
       }
       setPassword('');
       setConfirmPassword('');
       setMode('login');
+      setSuccessMessage('Your password has been successfully reset. You can now sign in with your new password.');
       onPasswordRecoveryExit?.();
     } catch (err: any) {
       console.error('[Password Recovery] Could not update password:', err?.message || 'unknown error');
@@ -616,6 +738,7 @@ export function Auth({
         ? err.message
         : 'We could not update your password. The reset link may have expired; request a new one and try again.');
     } finally {
+      recoveryRequestInProgress.current = false;
       setIsLoading(false);
     }
   };
@@ -697,6 +820,7 @@ export function Auth({
               {mode === 'login' && 'Welcome Back'}
               {mode === 'signup' && 'Create Resident Account'}
               {mode === 'forgot-password' && 'Reset Password'}
+              {mode === 'verify-recovery-otp' && 'Verify Your Email'}
               {mode === 'update-password' && 'Choose a New Password'}
               {mode === 'complete-profile' && 'Complete Resident Registration'}
             </h2>
@@ -704,6 +828,7 @@ export function Auth({
               {mode === 'login' && 'Sign in to access your barangay portal'}
               {mode === 'signup' && 'Register as a resident of Barangay Pupua'}
               {mode === 'forgot-password' && 'Enter your email to receive recovery instructions'}
+              {mode === 'verify-recovery-otp' && 'Enter the 6-digit code sent to your email'}
               {mode === 'update-password' && 'Enter and confirm your new account password'}
               {mode === 'complete-profile' && 'Finish your profile and identity verification for administrator review'}
             </p>
@@ -874,7 +999,7 @@ export function Auth({
                 className="w-full h-11 bg-blue-600 hover:bg-blue-700 active:scale-[0.99] text-white font-bold rounded-xl shadow-lg shadow-blue-600/20 transition-all flex items-center justify-center gap-2 text-sm disabled:opacity-70"
               >
                 {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
-                <span>Send Reset Link</span>
+                <span>Send Verification Code</span>
               </button>
 
               <div className="text-center pt-4 border-t border-slate-100">
@@ -892,6 +1017,73 @@ export function Auth({
                 >
                   <ArrowLeft className="w-3.5 h-3.5" />
                   <span>Back to Sign In</span>
+                </button>
+              </div>
+            </form>
+          )}
+
+          {mode === 'verify-recovery-otp' && (
+            <form onSubmit={handleVerifyRecoveryOtp} className="space-y-4">
+              <p className="text-sm text-slate-600 text-center">
+                Enter the code sent to <span className="font-semibold text-slate-800">{email}</span>.
+                The code expires in 5 minutes.
+              </p>
+              <div>
+                <label htmlFor="recovery-otp" className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  6-Digit Verification Code
+                </label>
+                <input
+                  id="recovery-otp"
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  pattern="[0-9]{6}"
+                  maxLength={RECOVERY_OTP_LENGTH}
+                  required
+                  value={recoveryOtp}
+                  onChange={event => setRecoveryOtp(sanitizeRecoveryOtp(event.target.value))}
+                  placeholder="000000"
+                  aria-describedby="recovery-otp-status"
+                  className="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-center text-xl tracking-[0.4em] font-bold focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white transition-all"
+                />
+              </div>
+              <div id="recovery-otp-status" className="text-xs text-center text-slate-500" aria-live="polite">
+                {recoverySeconds > 0
+                  ? `Code expires in ${Math.floor(recoverySeconds / 60)}:${String(recoverySeconds % 60).padStart(2, '0')}`
+                  : 'This code has expired. Request a new code to continue.'}
+                {otpAttempts > 0 && otpAttempts < RECOVERY_MAX_ATTEMPTS
+                  ? ` · ${RECOVERY_MAX_ATTEMPTS - otpAttempts} attempts remaining`
+                  : ''}
+              </div>
+              <button
+                type="submit"
+                disabled={isLoading || recoveryOtp.length !== RECOVERY_OTP_LENGTH || recoverySeconds === 0 || otpAttempts >= RECOVERY_MAX_ATTEMPTS}
+                className="w-full h-11 bg-blue-600 hover:bg-blue-700 active:scale-[0.99] text-white font-bold rounded-xl shadow-lg shadow-blue-600/20 transition-all flex items-center justify-center gap-2 text-sm disabled:opacity-70"
+              >
+                {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                <span>Verify Code</span>
+              </button>
+              <div className="flex items-center justify-between border-t border-slate-100 pt-4">
+                <button
+                  type="button"
+                  disabled={isLoading}
+                  onClick={() => {
+                    setRecoveryOtp('');
+                    setError(null);
+                    setSuccessMessage(null);
+                    setMode('forgot-password');
+                  }}
+                  className="text-xs font-bold text-slate-600 hover:text-slate-900 disabled:opacity-60"
+                >
+                  Change email
+                </button>
+                <button
+                  type="button"
+                  disabled={isLoading || resendSeconds > 0}
+                  onClick={() => void handleResendRecoveryOtp()}
+                  className="text-xs font-bold text-blue-700 hover:text-blue-800 disabled:text-slate-400"
+                >
+                  {resendSeconds > 0 ? `Resend code in ${resendSeconds}s` : 'Resend code'}
                 </button>
               </div>
             </form>

@@ -23,7 +23,26 @@ Set `GEMINI_API_KEY` in Vercel's server environment variables to enable Gemini. 
 
 See `.env.example` for variable names and placeholder formats. The local `.env` file must remain untracked.
 
-In Supabase Authentication URL Configuration, allow the deployed app origin as a redirect URL (and the local development origin when testing). Password recovery redirects to `/?auth_mode=recovery` on the current origin; Supabase must permit that origin for the recovery email link to return to the app.
+If you also use Supabase's recovery email link, allow the deployed app origin (and local development origin when testing) in Supabase Authentication URL Configuration. The new OTP flow stays on the page where the reset was requested.
+
+### Password reset OTP setup
+
+Password reset uses the existing Supabase Auth user store and recovery OTP (no separate password or OTP database). Before enabling it in production:
+
+1. In Supabase **Authentication > Sign In / Providers > Email**, set **Email OTP expiry** to `300` seconds and the OTP length to `6`. Supabase uses this expiration for other email authentication links too.
+2. In **Authentication > Email Templates > Reset Password**, use `{{ .Token }}` in the email body so users receive the six-digit code. Example:
+
+   ```html
+   <h2>Barangay Pupua Portal password reset</h2>
+   <p>Use this one-time code to reset your password:</p>
+   <p style="font-size: 28px; font-weight: bold; letter-spacing: 8px;">{{ .Token }}</p>
+   <p>This code expires in 5 minutes and can only be used once. If you did not request a reset, ignore this email.</p>
+   ```
+
+3. Configure a trusted SMTP provider under **Project Settings > Authentication > SMTP Settings**. Supabase's built-in email service has a low sending quota and is not intended for production delivery.
+4. Keep Supabase Auth's server-side email and verification rate limits enabled. The app allows one resend per 60 seconds and locks the current form after five failed code entries; Supabase also rate-limits recovery and verification requests on its servers.
+
+The app's five-minute display matches the configured Supabase expiry; the server-side expiry is authoritative. Supabase validates and consumes the OTP, issues a recovery session using the project's configured token lifetime, and stores the updated password using its built-in secure password handling.
 
 ## Database setup
 
@@ -36,4 +55,4 @@ Run the applicable SQL migrations in the Supabase SQL Editor before using regist
 - `npm run lint` checks TypeScript.
 - `npm run build:web` builds only the Vercel frontend.
 - `npm run build` builds the frontend and Express server bundle.
-- `node --import tsx --test src/lib/chatReliability.test.ts` runs the chatbot reliability tests.
+- `node --import tsx --test src/lib/passwordRecovery.test.ts src/lib/chatReliability.test.ts` runs the password recovery and chatbot reliability tests.
