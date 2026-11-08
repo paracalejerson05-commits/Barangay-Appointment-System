@@ -4,7 +4,7 @@
 
 - The Vite frontend is deployed on Vercel.
 - The Express API runs as a Vercel serverless function in `api/[...path].ts`.
-- `vercel.json` routes `/api/*` to that function before applying the SPA fallback, so API methods and request bodies are handled by Express.
+- Vercel maps `/api/*` to the catch-all function automatically; `vercel.json` only contains the SPA fallback for frontend routes.
 - Connect the GitHub repository to Vercel to deploy the frontend and API together.
 
 ## Required environment variables
@@ -13,13 +13,11 @@ Set these in the hosting provider dashboards; never commit real values:
 
 ### Vercel
 
-- `VITE_SUPABASE_URL`
-- `VITE_SUPABASE_PUBLISHABLE_KEY`
-- `SUPABASE_URL`
-- `SUPABASE_KEY`
-- `SUPABASE_SECRET_KEY`
+- Frontend build: `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`.
+- API runtime: `SUPABASE_URL` and `SUPABASE_KEY` (or the corresponding `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` values). These must be available to the serverless function at runtime, not only to the frontend build.
+- API runtime for resident appointment submissions, checkout, administrator account profile management, and bulk announcement notifications: `SUPABASE_SECRET_KEY` or `SUPABASE_SERVICE_ROLE_KEY`. Keep this server-only; never use a `VITE_` prefix.
 
-Set `GEMINI_API_KEY` in Vercel's server environment variables to enable Gemini. Keep it server-only: never prefix it with `VITE_` or commit its value. Without the key or when Gemini is unavailable, the authenticated chatbot uses its limited verified-information fallback. `SMTP_EMAIL` and `SMTP_PASSWORD` are optional email integration variables.
+`GEMINI_API_KEY`, `SMTP_EMAIL`, and `SMTP_PASSWORD` are optional server-side integrations. Keep them server-only; never prefix secrets with `VITE_`. Without `GEMINI_API_KEY` or when Gemini is unavailable, the authenticated chatbot uses its limited verified-information fallback. `APP_URL` is not read by the current application.
 
 See `.env.example` for variable names and placeholder formats. The local `.env` file must remain untracked.
 

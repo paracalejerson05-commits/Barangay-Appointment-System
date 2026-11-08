@@ -288,6 +288,15 @@ async function createApp() {
   const app = express();
 
   app.use(express.json());
+  app.use((error: any, _req: express.Request, res: express.Response, next: express.NextFunction) => {
+    if (error?.type === 'entity.parse.failed') {
+      return res.status(400).json({ error: 'Request body must contain valid JSON.' });
+    }
+    if (error?.type === 'entity.too.large') {
+      return res.status(413).json({ error: 'Request body is too large.' });
+    }
+    return next(error);
+  });
 
   app.get('/health', (_req, res) => {
     res.status(200).json({ ok: true });
@@ -1812,6 +1821,10 @@ ${JSON.stringify(services)}`;
       console.error('[Email] Delivery failed:', error?.message || 'Unknown SMTP error');
       res.status(500).json({ error: "Failed to send email" });
     }
+  });
+
+  app.use('/api', (_req, res) => {
+    res.status(404).json({ error: 'API endpoint not found.' });
   });
 
   // Vite middleware for development
