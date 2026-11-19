@@ -27,6 +27,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { cn, formatDate, parseToDate } from '../lib/utils';
 import { useLocation, Link } from 'react-router-dom';
 import { useSchedule } from '../hooks/useSchedule';
+import { useLoadingActions } from '../hooks/useLoadingActions';
 import { ScheduleManager } from './ScheduleManager';
 import { sendApprovalEmail, sendDisapprovalEmail } from '../lib/email';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
@@ -793,7 +794,7 @@ export function AdminDashboard({ user, profile }: AdminDashboardProps) {
 function RequestDetailsModal({ request: initialRequest, onClose, user, onRequestUpdated }: { request: any, onClose: () => void, user: any, onRequestUpdated: (request: any) => void }) {
   const [request, setRequest] = useState(initialRequest);
   const [adminNotes, setAdminNotes] = useState(request.adminNotes || '');
-  const [isUpdating, setIsUpdating] = useState(false);
+  const { isLoading, startLoading, stopLoading } = useLoadingActions();
   const [showCertificateEditor, setShowCertificateEditor] = useState(false);
   const [initialDocumentAction, setInitialDocumentAction] = useState<'PRINT' | 'DOWNLOAD' | null>(null);
   const [confirmAction, setConfirmAction] = useState<null | 'approved' | 'disapproved'>(null);
@@ -823,7 +824,8 @@ function RequestDetailsModal({ request: initialRequest, onClose, user, onRequest
     
     
 
-    setIsUpdating(true);
+    const action = `update-request-status:${request.id}:${status}`;
+    if (!startLoading(action)) return;
     try {
       if (!(await dbUpdateServiceRequest(request.id, { status, adminNotes }))) {
         throw new Error('Failed to update the request in Supabase.');
@@ -891,7 +893,7 @@ function RequestDetailsModal({ request: initialRequest, onClose, user, onRequest
       console.error("Error updating request:", error);
       setErrorMessage("Failed to update request: " + (error instanceof Error ? error.message : "Unknown error")); setConfirmAction(null);
     } finally {
-      setIsUpdating(false);
+      stopLoading(action);
     }
   };
 
@@ -901,7 +903,8 @@ function RequestDetailsModal({ request: initialRequest, onClose, user, onRequest
   };
 
   const handleComplete = async (action: 'PRINT' | 'DOWNLOAD') => {
-    setIsUpdating(true);
+    const loadingAction = `complete-request:${request.id}:${action}`;
+    if (!startLoading(loadingAction)) return;
     setErrorMessage('');
     try {
       const result = await dbCompleteServiceRequest(request.id, action);
@@ -918,7 +921,7 @@ function RequestDetailsModal({ request: initialRequest, onClose, user, onRequest
       setErrorMessage(error?.message || 'The request could not be marked completed.');
       throw error;
     } finally {
-      setIsUpdating(false);
+      stopLoading(loadingAction);
     }
   };
 
@@ -1073,7 +1076,7 @@ function RequestDetailsModal({ request: initialRequest, onClose, user, onRequest
               <div className="p-4 border-t border-[#E2E8F0] bg-[#F8FAFC] flex flex-col flex-shrink-0">
   {errorMessage && <div className="text-red-600 text-xs mb-3 text-right bg-red-50 p-2 rounded">{errorMessage}</div>}
   {successMessage && <div className="text-green-600 text-xs mb-3 text-right bg-green-50 p-2 rounded">{successMessage}</div>}
-  {confirmAction && !isUpdating && !successMessage && (
+  {confirmAction && !isLoading(`update-request-status:${request.id}:${confirmAction}`) && !successMessage && (
     <div className="text-amber-700 text-xs mb-3 text-right bg-amber-50 p-2 rounded flex justify-between items-center">
       <span>Are you sure you want to <b>{confirmAction}</b> this request?</span>
       <button onClick={() => setConfirmAction(null)} className="underline text-gray-500 hover:text-gray-700">Cancel</button>
@@ -1089,20 +1092,20 @@ function RequestDetailsModal({ request: initialRequest, onClose, user, onRequest
                       Cancel
                     </button>
                     <button
-                      disabled={isUpdating}
+                      disabled={isLoading(`update-request-status:${request.id}:approved`) || isLoading(`update-request-status:${request.id}:disapproved`)}
                       onClick={() => handleUpdateStatus('disapproved')}
                       className="w-full sm:w-auto px-4 py-2 bg-white border border-red-200 text-red-600 hover:bg-red-50 text-xs font-semibold rounded-[6px] transition-colors shadow-sm flex items-center justify-center gap-1.5 disabled:opacity-50"
                     >
-                      {isUpdating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <XCircle className="w-3.5 h-3.5" />}
-                      {isUpdating ? "Processing..." : "Disapprove Request"}
+                      {isLoading(`update-request-status:${request.id}:disapproved`) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <XCircle className="w-3.5 h-3.5" />}
+                      {isLoading(`update-request-status:${request.id}:disapproved`) ? "Processing..." : "Disapprove Request"}
                     </button>
                     <button
-                      disabled={isUpdating}
+                      disabled={isLoading(`update-request-status:${request.id}:approved`) || isLoading(`update-request-status:${request.id}:disapproved`)}
                       onClick={() => handleUpdateStatus('approved')}
                       className="w-full sm:w-auto px-4 py-2 bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-xs font-semibold rounded-[6px] transition-colors shadow-sm flex items-center justify-center gap-1.5 disabled:opacity-50"
                     >
-                      {isUpdating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
-                      {isUpdating ? "Processing..." : "Approve Request"}
+                      {isLoading(`update-request-status:${request.id}:approved`) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                      {isLoading(`update-request-status:${request.id}:approved`) ? "Processing..." : "Approve Request"}
                     </button>
                   </>
                 )}

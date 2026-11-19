@@ -49,7 +49,8 @@ export interface ResidentRegistrationSubmission {
 interface ResidentRegistrationFormProps {
   existingUser?: any;
   existingProfile?: any;
-  isLoading: boolean;
+  isSubmitting: boolean;
+  isGoogleLoading: boolean;
   error: string | null;
   successMessage: string | null;
   onSubmit: (submission: ResidentRegistrationSubmission) => void;
@@ -197,7 +198,8 @@ function localDateString() {
 export function ResidentRegistrationForm({
   existingUser,
   existingProfile,
-  isLoading,
+  isSubmitting,
+  isGoogleLoading,
   error,
   successMessage,
   onSubmit,
@@ -391,7 +393,7 @@ export function ResidentRegistrationForm({
 
   const submitRegistration = (event: React.FormEvent) => {
     event.preventDefault();
-    if (isLoading) return;
+    if (isSubmitting) return;
     if (step < STEPS.length - 1) {
       continueStep();
       return;
@@ -507,8 +509,9 @@ export function ResidentRegistrationForm({
               <div className="flex items-center gap-3 py-1" aria-hidden="true">
                 <span className="h-px flex-1 bg-slate-200" /><span className="text-[11px] font-bold text-slate-400">OR</span><span className="h-px flex-1 bg-slate-200" />
               </div>
-              <button type="button" disabled={isLoading} onClick={onGoogleSignIn} className="auth-google-button flex min-h-[50px] w-full items-center justify-center gap-3 rounded-xl border border-slate-300 text-sm font-semibold text-slate-700 shadow-sm disabled:opacity-50">
-                <span className="text-lg font-bold text-blue-600">G</span> Continue with Google
+              <button type="button" disabled={isGoogleLoading} onClick={onGoogleSignIn} className="auth-google-button flex min-h-[50px] w-full items-center justify-center gap-3 rounded-xl border border-slate-300 text-sm font-semibold text-slate-700 shadow-sm disabled:opacity-50">
+                {isGoogleLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <span className="text-lg font-bold text-blue-600">G</span>}
+                Continue with Google
               </button>
               <p className="text-center text-xs text-slate-600">Already registered? <button type="button" onClick={onSignIn} className="min-h-[40px] font-bold text-blue-700 hover:underline">Sign in</button></p>
             </>
@@ -704,7 +707,7 @@ export function ResidentRegistrationForm({
       )}
 
       <div className="flex flex-col-reverse gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:justify-between">
-        <button type="button" onClick={() => step === 0 ? onSignIn() : setStep(current => Math.max(current - 1, 0))} disabled={isLoading} className="flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-300 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">
+        <button type="button" onClick={() => step === 0 ? onSignIn() : setStep(current => Math.max(current - 1, 0))} disabled={isSubmitting} className="flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-300 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">
           <ArrowLeft className="h-4 w-4" /> {step === 0 ? (existingUser ? 'Sign Out' : 'Sign In') : 'Back'}
         </button>
         {step < STEPS.length - 1 ? (
@@ -712,8 +715,8 @@ export function ResidentRegistrationForm({
             Continue <ArrowRight className="h-4 w-4" />
           </button>
         ) : (
-          <button type="submit" disabled={isLoading} className="flex min-h-11 items-center justify-center gap-2 rounded-lg bg-blue-600 px-5 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-60">
-            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
+          <button type="submit" disabled={isSubmitting} className="flex min-h-11 items-center justify-center gap-2 rounded-lg bg-blue-600 px-5 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-60">
+            {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
             Submit for Approval
           </button>
         )}

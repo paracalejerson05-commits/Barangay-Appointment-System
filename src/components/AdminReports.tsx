@@ -28,6 +28,7 @@ import * as XLSX from 'xlsx';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { parseToDate } from '../lib/utils';
+import { useLoadingActions } from '../hooks/useLoadingActions';
 
 const getRecordedPaperSheets = (request: any): number | null => {
   const value = request.paperSheetsUsed ?? request.paperUsage;
@@ -38,6 +39,7 @@ export function AdminReports({ requests, residents }: { requests: any[], residen
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
   const [selectedMonth, setSelectedMonth] = useState('All');
   const [exportError, setExportError] = useState('');
+  const { isLoading, startLoading, stopLoading } = useLoadingActions();
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === 'dark';
 
@@ -188,9 +190,11 @@ export function AdminReports({ requests, residents }: { requests: any[], residen
   });
 
   // Export Functions
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
+    if (!startLoading('export-excel')) return;
     setExportError('');
     try {
+      await new Promise<void>(resolve => window.requestAnimationFrame(() => resolve()));
       const generatedAt = new Date();
       const monthLabel = selectedMonth === 'All' ? 'All Months' : months[months.indexOf(selectedMonth)];
       const totals = getMonthlyTotals();
@@ -295,12 +299,16 @@ export function AdminReports({ requests, residents }: { requests: any[], residen
     } catch (error) {
       console.error('Error exporting Excel report:', error);
       setExportError('Excel export failed. Please try again.');
+    } finally {
+      stopLoading('export-excel');
     }
   };
 
   const handleExportPDF = async () => {
+    if (!startLoading('export-pdf')) return;
     setExportError('');
     try {
+      await new Promise<void>(resolve => window.requestAnimationFrame(() => resolve()));
       const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
       const generatedAt = new Date();
       const pageWidth = doc.internal.pageSize.getWidth();
@@ -413,6 +421,8 @@ export function AdminReports({ requests, residents }: { requests: any[], residen
     } catch (error) {
       console.error('Error exporting PDF report:', error);
       setExportError(error instanceof Error ? error.message : 'PDF export failed. Please try again.');
+    } finally {
+      stopLoading('export-pdf');
     }
   };
 
@@ -478,17 +488,19 @@ export function AdminReports({ requests, residents }: { requests: any[], residen
           </button>
           <button 
             onClick={handleExportExcel}
+            disabled={isLoading('export-excel')}
             className="flex min-h-9 items-center gap-1.5 rounded-[6px] border border-emerald-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-700 shadow-sm transition-colors hover:bg-emerald-50"
           >
-            <FileSpreadsheet className="w-3.5 h-3.5" />
-            Excel
+            {isLoading('export-excel') ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileSpreadsheet className="w-3.5 h-3.5" />}
+            {isLoading('export-excel') ? 'Exporting…' : 'Excel'}
           </button>
           <button 
             onClick={handleExportPDF}
+            disabled={isLoading('export-pdf')}
             className="flex min-h-9 items-center gap-1.5 rounded-[6px] bg-[#2563EB] px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-[#1D4ED8]"
           >
-            <Download className="w-3.5 h-3.5" />
-            PDF
+            {isLoading('export-pdf') ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+            {isLoading('export-pdf') ? 'Exporting…' : 'PDF'}
           </button>
         </div>
       </div>

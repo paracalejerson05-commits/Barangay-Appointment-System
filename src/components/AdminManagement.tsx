@@ -18,6 +18,7 @@ import {
 import { supabase } from '../lib/supabase';
 import { isPrimaryAdmin } from '../lib/adminAccess';
 import { apiUrl } from '../lib/api';
+import { useLoadingActions } from '../hooks/useLoadingActions';
 
 interface Administrator {
   id: string;
@@ -172,7 +173,7 @@ export function AdminManagement({ user }: AdminManagementProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
-  const [deactivatingId, setDeactivatingId] = useState<string | null>(null);
+  const { isLoading: isActionLoading, startLoading, stopLoading } = useLoadingActions();
   const [showAddForm, setShowAddForm] = useState(false);
   const [selectedAdmin, setSelectedAdmin] = useState<Administrator | null>(null);
   const [isEditingAdmin, setIsEditingAdmin] = useState(false);
@@ -375,8 +376,9 @@ export function AdminManagement({ user }: AdminManagementProps) {
     if (!window.confirm(`Deactivate ${admin.display_name || admin.email}? They will no longer be able to access the administrator account.`)) {
       return;
     }
+    const action = `deactivate-admin:${admin.id}`;
+    if (!startLoading(action)) return;
     setFeedback(null);
-    setDeactivatingId(admin.id);
     try {
       await deactivateAdmin(admin.id);
       await loadAdmins();
@@ -384,7 +386,7 @@ export function AdminManagement({ user }: AdminManagementProps) {
     } catch (error) {
       setFeedback({ type: 'error', message: error instanceof Error ? error.message : 'Unable to deactivate this administrator.' });
     } finally {
-      setDeactivatingId(null);
+      stopLoading(action);
     }
   };
 
@@ -411,11 +413,11 @@ export function AdminManagement({ user }: AdminManagementProps) {
       {admin.status !== 'deactivated' && admin.status !== 'invited' && !isPrimaryAdmin(admin.email) && (
         <button
           type="button"
-          disabled={deactivatingId === admin.id}
+          disabled={isActionLoading(`deactivate-admin:${admin.id}`)}
           onClick={() => void handleDeactivate(admin)}
           className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-red-200 px-2.5 text-xs font-semibold text-red-700 transition hover:bg-red-50 disabled:opacity-50 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950/40"
         >
-          {deactivatingId === admin.id ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <UserX className="h-3.5 w-3.5" />}
+          {isActionLoading(`deactivate-admin:${admin.id}`) ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <UserX className="h-3.5 w-3.5" />}
           Deactivate
         </button>
       )}

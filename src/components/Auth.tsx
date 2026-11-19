@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
+import { useLoadingActions } from '../hooks/useLoadingActions';
 import { BARANGAY_LOGO_URL, BARANGAY_LOGO_FALLBACK, SYSTEM_NAME } from '../constants';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { dbAddNotification, dbGetUserById } from '../lib/supabaseDb';
@@ -227,7 +228,7 @@ export function Auth({
   
   // UI states
   const [showPassword, setShowPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const { isLoading, startLoading, stopLoading } = useLoadingActions();
   const [error, setError] = useState<React.ReactNode | null>(() => {
     if (typeof window === 'undefined') return null;
     const storedError = window.sessionStorage.getItem('resident-oauth-error');
@@ -235,7 +236,6 @@ export function Auth({
     return storedError || getOAuthCallbackError();
   });
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const registrationInProgress = useRef(false);
   const recoveryRequestInProgress = useRef(false);
 
   useEffect(() => {
@@ -303,7 +303,7 @@ export function Auth({
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
+    if (!startLoading('sign-in')) return;
     setError(null);
     try {
       const { data, error: signInErr } = await supabase.auth.signInWithPassword({
@@ -367,14 +367,12 @@ export function Auth({
       console.error('Login error:', err);
       setError(err.message || 'Failed to sign in. Please try again.');
     } finally {
-      setIsLoading(false);
+      stopLoading('sign-in');
     }
   };
 
   const handleSignup = async (submission: ResidentRegistrationSubmission) => {
-    if (registrationInProgress.current) return;
-    registrationInProgress.current = true;
-    setIsLoading(true);
+    if (!startLoading('registration')) return;
     setError(null);
     setSuccessMessage(null);
     const uploadedPaths: string[] = [];
@@ -563,13 +561,12 @@ export function Auth({
         setError(err.message || 'Failed to complete registration.');
       }
     } finally {
-      registrationInProgress.current = false;
-      setIsLoading(false);
+      stopLoading('registration');
     }
   };
 
   const handleSocialSignIn = async () => {
-    setIsLoading(true);
+    if (!startLoading('google-sign-in')) return;
     setError(null);
     setSuccessMessage(null);
     try {
@@ -583,15 +580,16 @@ export function Auth({
     } catch (err: any) {
       console.error('Google sign-in error:', err);
       setError(err.message || 'Could not start Google sign-in.');
-      setIsLoading(false);
+    } finally {
+      stopLoading('google-sign-in');
     }
   };
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (recoveryRequestInProgress.current) return;
+    if (!startLoading('send-recovery-code')) return;
     recoveryRequestInProgress.current = true;
-    setIsLoading(true);
     setError(null);
     setSuccessMessage(null);
     try {
@@ -611,7 +609,7 @@ export function Auth({
         : 'We could not send password reset instructions right now. Check your connection and try again.');
     } finally {
       recoveryRequestInProgress.current = false;
-      setIsLoading(false);
+      stopLoading('send-recovery-code');
     }
   };
 
@@ -633,8 +631,8 @@ export function Auth({
       return;
     }
 
+    if (!startLoading('verify-recovery-code')) return;
     recoveryRequestInProgress.current = true;
-    setIsLoading(true);
     setError(null);
     setSuccessMessage(null);
     try {
@@ -665,14 +663,14 @@ export function Auth({
           : 'That code is invalid or expired. Check the email and try again.');
     } finally {
       recoveryRequestInProgress.current = false;
-      setIsLoading(false);
+      stopLoading('verify-recovery-code');
     }
   };
 
   const handleResendRecoveryOtp = async () => {
-    if (recoveryRequestInProgress.current || isLoading || resendSeconds > 0) return;
+    if (recoveryRequestInProgress.current || resendSeconds > 0) return;
+    if (!startLoading('resend-recovery-code')) return;
     recoveryRequestInProgress.current = true;
-    setIsLoading(true);
     setError(null);
     setSuccessMessage(null);
     try {
@@ -691,28 +689,26 @@ export function Auth({
         : 'We could not resend the code right now. Check your connection and try again.');
     } finally {
       recoveryRequestInProgress.current = false;
-      setIsLoading(false);
+      stopLoading('resend-recovery-code');
     }
   };
 
   const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (recoveryRequestInProgress.current) return;
-    setIsLoading(true);
     setError(null);
     setSuccessMessage(null);
 
     if (password.length < 8) {
       setError('Choose a password with at least 8 characters.');
-      setIsLoading(false);
       return;
     }
     if (password !== confirmPassword) {
       setError('The passwords do not match.');
-      setIsLoading(false);
       return;
     }
 
+    if (!startLoading('update-password')) return;
     recoveryRequestInProgress.current = true;
     try {
       const { error: updateError } = await supabase.auth.updateUser({ password });
@@ -739,12 +735,12 @@ export function Auth({
         : 'We could not update your password. The reset link may have expired; request a new one and try again.');
     } finally {
       recoveryRequestInProgress.current = false;
-      setIsLoading(false);
+      stopLoading('update-password');
     }
   };
 
   const handleExitPasswordRecovery = async () => {
-    setIsLoading(true);
+    if (!startLoading('exit-password-recovery')) return;
     setError(null);
     try {
       const { error: signOutError } = await supabase.auth.signOut();
@@ -758,7 +754,7 @@ export function Auth({
       console.error('[Password Recovery] Could not end the recovery session:', err?.message || 'unknown error');
       setError('We could not safely end the reset session. Please refresh the page and request a new reset link if needed.');
     } finally {
-      setIsLoading(false);
+      stopLoading('exit-password-recovery');
     }
   };
 
@@ -923,10 +919,10 @@ export function Auth({
 
               <button
                 type="submit"
-                disabled={isLoading}
+                disabled={isLoading('sign-in')}
                 className="auth-primary-button w-full min-h-[50px] bg-blue-600 hover:bg-blue-700 active:scale-[0.99] text-white font-bold rounded-xl shadow-lg shadow-blue-600/20 transition-all flex items-center justify-center gap-2 text-sm disabled:opacity-70"
               >
-                {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogIn className="w-4 h-4" />}
+                {isLoading('sign-in') ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogIn className="w-4 h-4" />}
                 <span>Sign In</span>
               </button>
 
@@ -936,7 +932,7 @@ export function Auth({
                   <span className="text-[11px] font-bold text-slate-500">OR</span>
                   <span className="h-px flex-1 bg-slate-200" />
                 </div>
-                <GoogleSignInButton isLoading={isLoading} isAvailable={googleOAuthAvailable} onClick={handleSocialSignIn} />
+                <GoogleSignInButton isLoading={isLoading('google-sign-in')} isAvailable={googleOAuthAvailable} onClick={handleSocialSignIn} />
                 <p className="text-sm text-slate-600 text-center">
                   Don't have an account?{' '}
                   <button
@@ -955,7 +951,8 @@ export function Auth({
             <ResidentRegistrationForm
               existingUser={registrationUser}
               existingProfile={existingProfile}
-              isLoading={isLoading}
+              isSubmitting={isLoading('registration')}
+              isGoogleLoading={isLoading('google-sign-in')}
               error={typeof error === 'string' ? error : null}
               successMessage={successMessage}
               onSubmit={handleSignup}
@@ -995,16 +992,17 @@ export function Auth({
 
               <button
                 type="submit"
-                disabled={isLoading}
+                disabled={isLoading('send-recovery-code')}
                 className="w-full h-11 bg-blue-600 hover:bg-blue-700 active:scale-[0.99] text-white font-bold rounded-xl shadow-lg shadow-blue-600/20 transition-all flex items-center justify-center gap-2 text-sm disabled:opacity-70"
               >
-                {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
+                {isLoading('send-recovery-code') ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
                 <span>Send Verification Code</span>
               </button>
 
               <div className="text-center pt-4 border-t border-slate-100">
                 <button
                   type="button"
+                  disabled={isLoading('exit-password-recovery')}
                   onClick={() => {
                     if (passwordRecovery) {
                       void handleExitPasswordRecovery();
@@ -1015,7 +1013,7 @@ export function Auth({
                   }}
                   className="text-xs font-bold text-slate-600 hover:text-slate-900 flex items-center justify-center gap-1 mx-auto"
                 >
-                  <ArrowLeft className="w-3.5 h-3.5" />
+                  {isLoading('exit-password-recovery') ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ArrowLeft className="w-3.5 h-3.5" />}
                   <span>Back to Sign In</span>
                 </button>
               </div>
@@ -1057,16 +1055,16 @@ export function Auth({
               </div>
               <button
                 type="submit"
-                disabled={isLoading || recoveryOtp.length !== RECOVERY_OTP_LENGTH || recoverySeconds === 0 || otpAttempts >= RECOVERY_MAX_ATTEMPTS}
+                disabled={isLoading('verify-recovery-code') || recoveryOtp.length !== RECOVERY_OTP_LENGTH || recoverySeconds === 0 || otpAttempts >= RECOVERY_MAX_ATTEMPTS}
                 className="w-full h-11 bg-blue-600 hover:bg-blue-700 active:scale-[0.99] text-white font-bold rounded-xl shadow-lg shadow-blue-600/20 transition-all flex items-center justify-center gap-2 text-sm disabled:opacity-70"
               >
-                {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                {isLoading('verify-recovery-code') ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
                 <span>Verify Code</span>
               </button>
               <div className="flex items-center justify-between border-t border-slate-100 pt-4">
                 <button
                   type="button"
-                  disabled={isLoading}
+                  disabled={isLoading('verify-recovery-code') || isLoading('resend-recovery-code')}
                   onClick={() => {
                     setRecoveryOtp('');
                     setError(null);
@@ -1079,11 +1077,12 @@ export function Auth({
                 </button>
                 <button
                   type="button"
-                  disabled={isLoading || resendSeconds > 0}
+                  disabled={isLoading('verify-recovery-code') || isLoading('resend-recovery-code') || resendSeconds > 0}
                   onClick={() => void handleResendRecoveryOtp()}
                   className="text-xs font-bold text-blue-700 hover:text-blue-800 disabled:text-slate-400"
                 >
-                  {resendSeconds > 0 ? `Resend code in ${resendSeconds}s` : 'Resend code'}
+                  {isLoading('resend-recovery-code') ? <Loader2 className="inline w-3.5 h-3.5 animate-spin mr-1" /> : null}
+                  {resendSeconds > 0 ? `Resend code in ${resendSeconds}s` : isLoading('resend-recovery-code') ? 'Sending code…' : 'Resend code'}
                 </button>
               </div>
             </form>
@@ -1125,20 +1124,20 @@ export function Auth({
               </div>
               <button
                 type="submit"
-                disabled={isLoading}
+                disabled={isLoading('update-password')}
                 className="w-full h-11 bg-blue-600 hover:bg-blue-700 active:scale-[0.99] text-white font-bold rounded-xl shadow-lg shadow-blue-600/20 transition-all flex items-center justify-center gap-2 text-sm disabled:opacity-70"
               >
-                {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Key className="w-4 h-4" />}
+                {isLoading('update-password') ? <Loader2 className="w-4 h-4 animate-spin" /> : <Key className="w-4 h-4" />}
                 <span>Update Password</span>
               </button>
               <div className="text-center pt-4 border-t border-slate-100">
                 <button
                   type="button"
-                  disabled={isLoading}
+                  disabled={isLoading('update-password') || isLoading('exit-password-recovery')}
                   onClick={() => void handleExitPasswordRecovery()}
                   className="text-xs font-bold text-slate-600 hover:text-slate-900 flex items-center justify-center gap-1 mx-auto disabled:opacity-60"
                 >
-                  <ArrowLeft className="w-3.5 h-3.5" />
+                  {isLoading('exit-password-recovery') ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ArrowLeft className="w-3.5 h-3.5" />}
                   <span>Back to Sign In</span>
                 </button>
               </div>

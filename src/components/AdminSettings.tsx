@@ -41,6 +41,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { syncUserToSupabase } from '../lib/supabaseSync';
 import { dbGetAnnouncements, dbSaveAnnouncement, dbDeleteAnnouncement } from '../lib/supabaseDb';
+import { useLoadingActions } from '../hooks/useLoadingActions';
 
 interface AdminSettingsProps {
   user: any;
@@ -53,7 +54,7 @@ export function AdminSettings({ user, profile }: AdminSettingsProps) {
   const { theme: themeMode, setTheme } = useTheme();
   const sectionFromHash = (): AdminSettingsSection => window.location.hash === '#account' ? 'account' : 'profile';
   const [activeSection, setActiveSection] = useState<AdminSettingsSection>(sectionFromHash);
-  const [isSaving, setIsSaving] = useState(false);
+  const { isLoading, startLoading, stopLoading } = useLoadingActions();
   const [showSuccess, setShowSuccess] = useState(false);
   const [successMessage, setSuccessMessage] = useState('Admin settings updated successfully.');
   const [error, setError] = useState<string | null>(null);
@@ -164,7 +165,7 @@ export function AdminSettings({ user, profile }: AdminSettingsProps) {
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSaving(true);
+    if (!startLoading('save-profile')) return;
     setError(null);
     try {
       const targetUid = user?.uid || user?.id;
@@ -184,7 +185,7 @@ export function AdminSettings({ user, profile }: AdminSettingsProps) {
     } catch (err: any) {
       setError(err.message || 'Failed to update admin profile.');
     } finally {
-      setIsSaving(false);
+      stopLoading('save-profile');
     }
   };
 
@@ -199,7 +200,7 @@ export function AdminSettings({ user, profile }: AdminSettingsProps) {
       setError('New passwords do not match.');
       return;
     }
-    setIsSaving(true);
+    if (!startLoading('update-password')) return;
     try {
       const { error } = await supabase.auth.updateUser({ password: securityData.newPassword });
       if (error) throw error;
@@ -210,12 +211,13 @@ export function AdminSettings({ user, profile }: AdminSettingsProps) {
     } catch (err: any) {
       setError(err.message || 'Failed to update password.');
     } finally {
-      setIsSaving(false);
+      stopLoading('update-password');
     }
   };
 
   const handleSavePreferences = async (sectionName: string) => {
-    setIsSaving(true);
+    const action = `save-preferences:${sectionName}`;
+    if (!startLoading(action)) return;
     setError(null);
     try {
       const { error } = await supabase.auth.updateUser({ data: { adminNotifPrefs, systemPrefs, smartPrefs } });
@@ -226,7 +228,7 @@ export function AdminSettings({ user, profile }: AdminSettingsProps) {
     } catch (err: any) {
       setError(`Failed to save ${sectionName.toLowerCase()}.`);
     } finally {
-      setIsSaving(false);
+      stopLoading(action);
     }
   };
 
@@ -236,7 +238,7 @@ export function AdminSettings({ user, profile }: AdminSettingsProps) {
       setError('Title and content are required for announcements.');
       return;
     }
-    setIsSaving(true);
+    if (!startLoading('save-announcement')) return;
     try {
       const id = await dbSaveAnnouncement({ id: editingAnnouncementId || undefined, ...announcementForm });
       if (!id) throw new Error('Announcement could not be saved to Supabase.');
@@ -251,12 +253,14 @@ export function AdminSettings({ user, profile }: AdminSettingsProps) {
     } catch (err: any) {
       setError('Failed to save announcement.');
     } finally {
-      setIsSaving(false);
+      stopLoading('save-announcement');
     }
   };
 
   const handleDeleteAnnouncement = async (id: string) => {
     if (!confirm('Are you sure you want to delete this announcement?')) return;
+    const action = `delete-announcement:${id}`;
+    if (!startLoading(action)) return;
     try {
       if (!(await dbDeleteAnnouncement(id))) throw new Error('Announcement could not be deleted from Supabase.');
       setAnnouncements(announcements.filter(a => a.id !== id));
@@ -265,6 +269,8 @@ export function AdminSettings({ user, profile }: AdminSettingsProps) {
       setTimeout(() => setShowSuccess(false), 4000);
     } catch (err) {
       setError('Failed to delete announcement.');
+    } finally {
+      stopLoading(action);
     }
   };
 
@@ -531,10 +537,10 @@ export function AdminSettings({ user, profile }: AdminSettingsProps) {
                   <div className="pt-3 flex justify-end">
                     <button
                       type="submit"
-                      disabled={isSaving}
+                      disabled={isLoading('save-profile')}
                       className="w-full sm:w-auto h-11 px-6 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-semibold text-xs sm:text-sm rounded-[10px] transition-colors shadow-sm flex items-center justify-center gap-2 cursor-pointer"
                     >
-                      {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                      {isLoading('save-profile') ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
                       <span>Save Profile Changes</span>
                     </button>
                   </div>
@@ -586,10 +592,10 @@ export function AdminSettings({ user, profile }: AdminSettingsProps) {
 
                   <button
                     type="submit"
-                    disabled={isSaving}
+                    disabled={isLoading('update-password')}
                     className="h-11 px-6 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-semibold text-xs sm:text-sm rounded-[10px] transition-colors shadow-sm flex items-center gap-2 cursor-pointer"
                   >
-                    {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Lock className="w-4 h-4" />}
+                    {isLoading('update-password') ? <Loader2 className="w-4 h-4 animate-spin" /> : <Lock className="w-4 h-4" />}
                     <span>Update Password</span>
                   </button>
                 </form>
@@ -722,10 +728,11 @@ export function AdminSettings({ user, profile }: AdminSettingsProps) {
                   <button
                     type="button"
                     onClick={() => handleSavePreferences('Notification')}
+                    disabled={isLoading('save-preferences:Notification')}
                     className="h-11 px-6 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-semibold text-xs sm:text-sm rounded-[10px] transition-colors shadow-sm flex items-center gap-2 cursor-pointer"
                   >
-                    <Check className="w-4 h-4" />
-                    <span>Save Notification Preferences</span>
+                    {isLoading('save-preferences:Notification') ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                    <span>{isLoading('save-preferences:Notification') ? 'Saving…' : 'Save Notification Preferences'}</span>
                   </button>
                 </div>
               </motion.div>
@@ -797,10 +804,11 @@ export function AdminSettings({ user, profile }: AdminSettingsProps) {
                     <button
                       type="button"
                       onClick={() => handleSavePreferences('System')}
+                      disabled={isLoading('save-preferences:System')}
                       className="h-11 px-6 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-semibold text-xs sm:text-sm rounded-[10px] transition-colors shadow-sm flex items-center gap-2 cursor-pointer"
                     >
-                      <Check className="w-4 h-4" />
-                      <span>Save System Preferences</span>
+                      {isLoading('save-preferences:System') ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                      <span>{isLoading('save-preferences:System') ? 'Saving…' : 'Save System Preferences'}</span>
                     </button>
                   </div>
                 </div>
@@ -885,10 +893,13 @@ export function AdminSettings({ user, profile }: AdminSettingsProps) {
                           <button
                             type="button"
                             onClick={() => handleDeleteAnnouncement(ann.id)}
+                            disabled={isLoading(`delete-announcement:${ann.id}`)}
                             className="p-2 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-[8px] text-xs font-semibold transition-colors cursor-pointer"
                             title="Delete"
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
+                            {isLoading(`delete-announcement:${ann.id}`)
+                              ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              : <Trash2 className="w-3.5 h-3.5" />}
                           </button>
                         </div>
                       </div>
@@ -978,10 +989,10 @@ export function AdminSettings({ user, profile }: AdminSettingsProps) {
                           </button>
                           <button
                             type="submit"
-                            disabled={isSaving}
+                            disabled={isLoading('save-announcement')}
                             className="px-5 py-2.5 rounded-[10px] bg-[#2563EB] hover:bg-[#1D4ED8] text-xs font-semibold text-white shadow-sm cursor-pointer flex items-center gap-1.5"
                           >
-                            {isSaving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                            {isLoading('save-announcement') && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                             <span>Save Announcement</span>
                           </button>
                         </div>
@@ -1035,10 +1046,11 @@ export function AdminSettings({ user, profile }: AdminSettingsProps) {
                   <button
                     type="button"
                     onClick={() => handleSavePreferences('Smart Queue & Assistance')}
+                    disabled={isLoading('save-preferences:Smart Queue & Assistance')}
                     className="h-11 px-6 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-semibold text-xs sm:text-sm rounded-[10px] transition-colors shadow-sm flex items-center gap-2 cursor-pointer"
                   >
-                    <Check className="w-4 h-4" />
-                    <span>Save Smart Preferences</span>
+                    {isLoading('save-preferences:Smart Queue & Assistance') ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                    <span>{isLoading('save-preferences:Smart Queue & Assistance') ? 'Saving…' : 'Save Smart Preferences'}</span>
                   </button>
                 </div>
               </motion.div>

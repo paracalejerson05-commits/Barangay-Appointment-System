@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
+import { useLoadingActions } from '../hooks/useLoadingActions';
 import { supabase } from '../lib/supabase';
 import { checkProfileCompletion, getAccountStatus } from '../lib/profileUtils';
 import { getResidentAge } from '../lib/residentRegistrationValidation';
@@ -57,7 +58,7 @@ export function Settings({ user, profile }: SettingsProps) {
   }
 
   const [activeSection, setActiveSection] = useState<SettingsSection>('profile');
-  const [isSaving, setIsSaving] = useState(false);
+  const { isLoading, startLoading, stopLoading } = useLoadingActions();
   const [showSuccess, setShowSuccess] = useState(false);
   const [successMessage, setSuccessMessage] = useState('Your settings have been updated successfully.');
   const [showPassword, setShowPassword] = useState(false);
@@ -223,7 +224,7 @@ export function Settings({ user, profile }: SettingsProps) {
     }
     if (!(e.currentTarget as HTMLFormElement).reportValidity()) return;
 
-    setIsSaving(true);
+    if (!startLoading('save-profile')) return;
     setError(null);
     setShowSuccess(false);
 
@@ -318,7 +319,7 @@ export function Settings({ user, profile }: SettingsProps) {
       console.error('Save profile error:', err);
       setError(err.message || 'Failed to update profile. Please try again.');
     } finally {
-      setIsSaving(false);
+      stopLoading('save-profile');
     }
   };
 
@@ -336,7 +337,7 @@ export function Settings({ user, profile }: SettingsProps) {
       return;
     }
 
-    setIsSaving(true);
+    if (!startLoading('update-password')) return;
     try {
       const { error } = await supabase.auth.updateUser({ password: securityData.newPassword });
       if (error) throw error;
@@ -349,12 +350,12 @@ export function Settings({ user, profile }: SettingsProps) {
       console.error('Password update error:', err);
       setError(err.message || 'Failed to update password. You may need to sign in again first.');
     } finally {
-      setIsSaving(false);
+      stopLoading('update-password');
     }
   };
 
   const handleSaveNotifications = async () => {
-    setIsSaving(true);
+    if (!startLoading('save-notifications')) return;
     setError(null);
     try {
       const targetUid = user?.uid || user?.id;
@@ -367,12 +368,12 @@ export function Settings({ user, profile }: SettingsProps) {
     } catch (err: any) {
       setError('Failed to save notification settings.');
     } finally {
-      setIsSaving(false);
+      stopLoading('save-notifications');
     }
   };
 
   const handleSaveAiPrefs = async () => {
-    setIsSaving(true);
+    if (!startLoading('save-ai-preferences')) return;
     setError(null);
     try {
       const targetUid = user?.uid || user?.id;
@@ -385,12 +386,12 @@ export function Settings({ user, profile }: SettingsProps) {
     } catch (err: any) {
       setError('Failed to save Smart Assistance preferences.');
     } finally {
-      setIsSaving(false);
+      stopLoading('save-ai-preferences');
     }
   };
 
   const handleSavePrivacy = async () => {
-    setIsSaving(true);
+    if (!startLoading('save-privacy-preferences')) return;
     setError(null);
     try {
       const targetUid = user?.uid || user?.id;
@@ -403,7 +404,7 @@ export function Settings({ user, profile }: SettingsProps) {
     } catch (err: any) {
       setError('Failed to save privacy settings.');
     } finally {
-      setIsSaving(false);
+      stopLoading('save-privacy-preferences');
     }
   };
 
@@ -977,10 +978,10 @@ export function Settings({ user, profile }: SettingsProps) {
                   <div className="pt-4 border-t border-[#F1F5F9] dark:border-slate-800 flex items-center justify-end">
                     <button
                       type="submit"
-                      disabled={isSaving}
+                      disabled={isLoading('save-profile')}
                       className="w-full sm:w-auto h-11 px-6 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-semibold text-xs sm:text-sm rounded-[10px] transition-colors shadow-sm disabled:opacity-60 flex items-center justify-center gap-2 cursor-pointer"
                     >
-                      {isSaving ? (
+                      {isLoading('save-profile') ? (
                         <>
                           <Loader2 className="w-4 h-4 animate-spin" />
                           <span>Saving Changes...</span>
@@ -1162,10 +1163,10 @@ export function Settings({ user, profile }: SettingsProps) {
 
                     <button
                       type="submit"
-                      disabled={isSaving}
+                      disabled={isLoading('update-password')}
                       className="h-11 px-6 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-semibold text-xs sm:text-sm rounded-[10px] transition-colors shadow-sm disabled:opacity-60 flex items-center gap-2 cursor-pointer"
                     >
-                      {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Lock className="w-4 h-4" />}
+                      {isLoading('update-password') ? <Loader2 className="w-4 h-4 animate-spin" /> : <Lock className="w-4 h-4" />}
                       <span>Update Password</span>
                     </button>
                   </div>
@@ -1285,10 +1286,10 @@ export function Settings({ user, profile }: SettingsProps) {
                   <button
                     type="button"
                     onClick={handleSaveNotifications}
-                    disabled={isSaving}
+                    disabled={isLoading('save-notifications')}
                     className="h-11 px-6 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-semibold text-xs sm:text-sm rounded-[10px] transition-colors shadow-sm disabled:opacity-60 flex items-center gap-2 cursor-pointer"
                   >
-                    {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                    {isLoading('save-notifications') ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
                     <span>Save Notifications</span>
                   </button>
                 </div>
@@ -1387,10 +1388,10 @@ export function Settings({ user, profile }: SettingsProps) {
                   <button
                     type="button"
                     onClick={handleSaveAiPrefs}
-                    disabled={isSaving}
+                    disabled={isLoading('save-ai-preferences')}
                     className="h-11 px-6 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-semibold text-xs sm:text-sm rounded-[10px] transition-colors shadow-sm disabled:opacity-60 flex items-center gap-2 cursor-pointer"
                   >
-                    {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                    {isLoading('save-ai-preferences') ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
                     <span>Save Smart Assistance</span>
                   </button>
                 </div>
@@ -1470,10 +1471,10 @@ export function Settings({ user, profile }: SettingsProps) {
                   <button
                     type="button"
                     onClick={handleSavePrivacy}
-                    disabled={isSaving}
+                    disabled={isLoading('save-privacy-preferences')}
                     className="h-11 px-6 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-semibold text-xs sm:text-sm rounded-[10px] transition-colors shadow-sm disabled:opacity-60 flex items-center gap-2 cursor-pointer"
                   >
-                    {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                    {isLoading('save-privacy-preferences') ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
                     <span>Save Privacy Settings</span>
                   </button>
                 </div>

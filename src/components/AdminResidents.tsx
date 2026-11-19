@@ -11,6 +11,7 @@ import { deleteUserFromSupabase, syncUserToSupabase, updateUserStatusInSupabase 
 import { dbAddNotification, dbGetServiceRequests } from '../lib/supabaseDb';
 import { checkProfileCompletion } from '../lib/profileUtils';
 import { AccountStatusBadge } from './AccountStatusBadge';
+import { useLoadingActions } from '../hooks/useLoadingActions';
 
 interface AdminResidentsProps {
   residents: any[];
@@ -31,9 +32,12 @@ export function AdminResidents({ residents, onAction }: AdminResidentsProps) {
 
   // Deactivation and deletion modal & notification states
   const [residentToDelete, setResidentToDelete] = useState<any | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
+  const { isLoading, startLoading, stopLoading } = useLoadingActions();
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const residentActionKey = (action: 'approve' | 'reject' | 'delete', resident: any) =>
+    `${action}-resident:${resident.uid || resident.id}`;
+  const isResidentActionBusy = (resident: any) =>
+    (['approve', 'reject', 'delete'] as const).some(action => isLoading(residentActionKey(action, resident)));
 
   // Sync residentList from Supabase users table and incoming props
   useEffect(() => {
@@ -179,7 +183,9 @@ export function AdminResidents({ residents, onAction }: AdminResidentsProps) {
     const targetUid = resident.uid || resident.id;
     if (!targetUid) return;
 
-    setIsProcessing(true);
+    const action = residentActionKey('approve', resident);
+    if (isResidentActionBusy(resident)) return;
+    if (!startLoading(action)) return;
     try {
       // 1. Update status in Supabase
       const sbResult = await updateUserStatusInSupabase(targetUid, 'active');
@@ -219,7 +225,7 @@ export function AdminResidents({ residents, onAction }: AdminResidentsProps) {
         message: err.message || 'Failed to approve resident.'
       });
     } finally {
-      setIsProcessing(false);
+      stopLoading(action);
     }
   };
 
@@ -241,7 +247,9 @@ export function AdminResidents({ residents, onAction }: AdminResidentsProps) {
     const targetUid = residentToReject.uid || residentToReject.id;
     if (!targetUid) return;
 
-    setIsProcessing(true);
+    const action = residentActionKey('reject', residentToReject);
+    if (isResidentActionBusy(residentToReject)) return;
+    if (!startLoading(action)) return;
     try {
       // 1. Update status in Supabase
       const sbResult = await updateUserStatusInSupabase(targetUid, 'inactive');
@@ -281,7 +289,7 @@ export function AdminResidents({ residents, onAction }: AdminResidentsProps) {
         message: err.message || 'Failed to reject resident registration.'
       });
     } finally {
-      setIsProcessing(false);
+      stopLoading(action);
     }
   };
 
@@ -309,7 +317,9 @@ export function AdminResidents({ residents, onAction }: AdminResidentsProps) {
       return;
     }
 
-    setIsDeleting(true);
+    const action = residentActionKey('delete', residentToDelete);
+    if (isResidentActionBusy(residentToDelete)) return;
+    if (!startLoading(action)) return;
     try {
       const targetUid = residentToDelete.uid || residentToDelete.id;
       if (!targetUid) {
@@ -339,7 +349,7 @@ export function AdminResidents({ residents, onAction }: AdminResidentsProps) {
         message: error?.message || 'Failed to remove resident from database.'
       });
     } finally {
-      setIsDeleting(false);
+      stopLoading(action);
     }
   };
 
@@ -617,15 +627,15 @@ export function AdminResidents({ residents, onAction }: AdminResidentsProps) {
                     <>
                       <button
                         onClick={() => handleApprove(resident)}
-                        disabled={isProcessing}
+                        disabled={isResidentActionBusy(resident)}
                         className="flex-1 h-11 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white font-bold text-xs rounded-[8px] flex items-center justify-center gap-1.5 shadow-xs transition-all cursor-pointer"
                       >
-                        <Check className="w-4 h-4" />
-                        <span>Approve</span>
+                        {isLoading(residentActionKey('approve', resident)) ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                        <span>{isLoading(residentActionKey('approve', resident)) ? 'Approving…' : 'Approve'}</span>
                       </button>
                       <button
                         onClick={() => handleReject(resident)}
-                        disabled={isProcessing}
+                        disabled={isResidentActionBusy(resident)}
                         className="flex-1 h-11 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 font-semibold text-xs rounded-[8px] flex items-center justify-center gap-1.5 transition-all cursor-pointer"
                       >
                         <X className="w-4 h-4" />
@@ -653,6 +663,7 @@ export function AdminResidents({ residents, onAction }: AdminResidentsProps) {
                         status={status}
                         onView={(r) => setSelectedResident(r)}
                         onApprove={handleApprove}
+                        isApproving={isLoading(residentActionKey('approve', resident))}
                         onReject={handleReject}
                         onEdit={handleEdit}
                         onDeactivate={handleDeactivate}
@@ -740,16 +751,16 @@ export function AdminResidents({ residents, onAction }: AdminResidentsProps) {
                         <div className="flex items-center justify-center gap-1.5">
                           <button
                             onClick={() => handleApprove(resident)}
-                            disabled={isProcessing}
+                            disabled={isResidentActionBusy(resident)}
                             title="Approve Resident"
                             className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-[6px] text-[11px] font-semibold flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
                           >
-                            <Check className="w-3.5 h-3.5" />
-                            <span>Approve</span>
+                            {isLoading(residentActionKey('approve', resident)) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                            <span>{isLoading(residentActionKey('approve', resident)) ? 'Approving…' : 'Approve'}</span>
                           </button>
                           <button
                             onClick={() => handleReject(resident)}
-                            disabled={isProcessing}
+                            disabled={isResidentActionBusy(resident)}
                             title="Reject Registration"
                             className="px-2 py-1 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-[6px] text-[11px] font-semibold flex items-center gap-1 transition-colors cursor-pointer"
                           >
@@ -778,6 +789,7 @@ export function AdminResidents({ residents, onAction }: AdminResidentsProps) {
                             status={status}
                             onView={(r) => setSelectedResident(r)}
                             onApprove={handleApprove}
+                            isApproving={isLoading(residentActionKey('approve', resident))}
                             onReject={handleReject}
                             onEdit={handleEdit}
                             onDeactivate={handleDeactivate}
@@ -869,8 +881,8 @@ export function AdminResidents({ residents, onAction }: AdminResidentsProps) {
                   </div>
                 </div>
                 <button 
-                  onClick={() => !isProcessing && setResidentToReject(null)}
-                  disabled={isProcessing}
+                  onClick={() => !isLoading(residentActionKey('reject', residentToReject)) && setResidentToReject(null)}
+                  disabled={isLoading(residentActionKey('reject', residentToReject))}
                   className="p-1 hover:bg-[#E2E8F0] rounded-[6px] transition-colors text-[#64748B] hover:text-[#0F172A]"
                 >
                   <X className="w-4 h-4" />
@@ -890,7 +902,7 @@ export function AdminResidents({ residents, onAction }: AdminResidentsProps) {
                 <button
                   type="button"
                   onClick={() => setResidentToReject(null)}
-                  disabled={isProcessing}
+                  disabled={isLoading(residentActionKey('reject', residentToReject))}
                   className="h-10 px-4 bg-white dark:bg-slate-900 border border-[#E2E8F0] dark:border-slate-700 text-[#0F172A] dark:text-slate-200 text-xs font-semibold rounded-[8px] hover:bg-[#F1F5F9] dark:hover:bg-slate-700 transition-colors"
                 >
                   Cancel
@@ -898,10 +910,10 @@ export function AdminResidents({ residents, onAction }: AdminResidentsProps) {
                 <button
                   type="button"
                   onClick={confirmRejectResident}
-                  disabled={isProcessing}
+                  disabled={isLoading(residentActionKey('reject', residentToReject))}
                   className="h-10 px-4 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-[6px] transition-colors flex items-center gap-1.5 shadow-sm"
                 >
-                  {isProcessing ? (
+                  {isLoading(residentActionKey('reject', residentToReject)) ? (
                     <>
                       <Loader2 className="w-3.5 h-3.5 animate-spin" />
                       <span>Processing...</span>
@@ -941,8 +953,8 @@ export function AdminResidents({ residents, onAction }: AdminResidentsProps) {
                   </div>
                 </div>
                 <button 
-                  onClick={() => !isDeleting && setResidentToDelete(null)}
-                  disabled={isDeleting}
+                  onClick={() => !isLoading(residentActionKey('delete', residentToDelete)) && setResidentToDelete(null)}
+                  disabled={isLoading(residentActionKey('delete', residentToDelete))}
                   className="p-1 hover:bg-[#E2E8F0] rounded-[6px] transition-colors text-[#64748B] hover:text-[#0F172A] disabled:opacity-40"
                 >
                   <X className="w-4 h-4" />
@@ -975,7 +987,7 @@ export function AdminResidents({ residents, onAction }: AdminResidentsProps) {
                 <button
                   type="button"
                   onClick={() => setResidentToDelete(null)}
-                  disabled={isDeleting}
+                  disabled={isLoading(residentActionKey('delete', residentToDelete))}
                   className="px-3.5 py-2 bg-white dark:bg-slate-900 border border-[#E2E8F0] dark:border-slate-700 text-[#0F172A] dark:text-slate-200 text-xs font-semibold rounded-[8px] hover:bg-[#F1F5F9] dark:hover:bg-slate-700 transition-colors disabled:opacity-40"
                 >
                   Cancel
@@ -983,10 +995,10 @@ export function AdminResidents({ residents, onAction }: AdminResidentsProps) {
                 <button
                   type="button"
                   onClick={confirmDeleteResident}
-                  disabled={isDeleting}
+                  disabled={isLoading(residentActionKey('delete', residentToDelete))}
                   className="px-3.5 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-[6px] transition-colors flex items-center gap-1.5 shadow-sm disabled:opacity-50"
                 >
-                  {isDeleting ? (
+                  {isLoading(residentActionKey('delete', residentToDelete)) ? (
                     <>
                       <Loader2 className="w-3.5 h-3.5 animate-spin" />
                       <span>Deleting...</span>
@@ -1011,6 +1023,7 @@ export function AdminResidents({ residents, onAction }: AdminResidentsProps) {
             resident={selectedResident} 
             status={getStatus(selectedResident)}
             onApprove={handleApprove}
+            isApproving={isLoading(residentActionKey('approve', selectedResident))}
             onReject={handleReject}
             onClose={() => setSelectedResident(null)} 
           />
@@ -1026,6 +1039,7 @@ function ActionMenu({
   status,
   onView, 
   onApprove,
+  isApproving,
   onReject,
   onEdit, 
   onDeactivate 
@@ -1034,6 +1048,7 @@ function ActionMenu({
   status: string,
   onView: (r: any) => void, 
   onApprove: (r: any) => void,
+  isApproving: boolean,
   onReject: (r: any) => void,
   onEdit: (r: any) => void, 
   onDeactivate: (r: any) => void 
@@ -1090,9 +1105,10 @@ function ActionMenu({
           {status === 'inactive' && (
             <button 
               onClick={() => { setIsOpen(false); onApprove(resident); }} 
-              className="w-full text-left px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 flex items-center gap-2 cursor-pointer"
+              disabled={isApproving}
+              className="w-full text-left px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 flex items-center gap-2 cursor-pointer disabled:opacity-60"
             >
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Reactivate / Approve
+              {isApproving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />} Reactivate / Approve
             </button>
           )}
 
@@ -1129,12 +1145,14 @@ function ResidentDetailsModal({
   resident, 
   status, 
   onApprove,
+  isApproving,
   onReject,
   onClose 
 }: { 
   resident: any, 
   status: string, 
   onApprove: (r: any) => void,
+  isApproving: boolean,
   onReject: (r: any) => void,
   onClose: () => void 
 }) {
@@ -1417,6 +1435,7 @@ function ResidentDetailsModal({
                 <button
                   type="button"
                   onClick={() => onReject(resident)}
+                  disabled={isApproving}
                   className="h-10 px-4 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 text-xs font-semibold rounded-[8px] transition-colors flex items-center justify-center gap-1.5 cursor-pointer flex-1 sm:flex-initial"
                 >
                   <X className="w-3.5 h-3.5" />
@@ -1425,10 +1444,11 @@ function ResidentDetailsModal({
                 <button 
                   type="button"
                   onClick={() => onApprove(resident)}
-                  className="h-10 px-5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-[8px] transition-colors flex items-center justify-center gap-1.5 shadow-sm cursor-pointer flex-1 sm:flex-initial"
+                  disabled={isApproving}
+                  className="h-10 px-5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-[8px] transition-colors flex items-center justify-center gap-1.5 shadow-sm cursor-pointer flex-1 sm:flex-initial disabled:opacity-60"
                 >
-                  <Check className="w-4 h-4" />
-                  <span>Approve Resident</span>
+                  {isApproving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                  <span>{isApproving ? 'Approving…' : 'Approve Resident'}</span>
                 </button>
               </>
             ) : (

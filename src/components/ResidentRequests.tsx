@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { formatDate } from '../lib/utils';
 import { getRequestReference } from '../lib/requestPresentation';
+import { useLoadingActions } from '../hooks/useLoadingActions';
 
 interface ResidentRequestsProps {
   user: any;
@@ -75,7 +76,7 @@ export function ResidentRequests({ user }: ResidentRequestsProps) {
   const [requests, setRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedRequest, setSelectedRequest] = useState<any | null>(null);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const { isLoading, startLoading, stopLoading } = useLoadingActions();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
@@ -184,7 +185,8 @@ export function ResidentRequests({ user }: ResidentRequestsProps) {
   const handleDeleteRequest = async (request: any) => {
     if (!window.confirm(`Delete your pending ${request.serviceType} request? This cannot be undone.`)) return;
 
-    setDeletingId(request.id);
+    const action = `delete-request:${request.id}`;
+    if (!startLoading(action)) return;
     try {
       await dbDeleteServiceRequest(request.id);
       setRequests(current => current.filter(item => item.id !== request.id));
@@ -192,7 +194,7 @@ export function ResidentRequests({ user }: ResidentRequestsProps) {
     } catch (error: any) {
       window.alert(error?.message || 'The request could not be deleted. Please try again.');
     } finally {
-      setDeletingId(null);
+      stopLoading(action);
     }
   };
 
@@ -320,12 +322,12 @@ export function ResidentRequests({ user }: ResidentRequestsProps) {
                               <button
                                 type="button"
                                 onClick={() => void handleDeleteRequest(request)}
-                                disabled={deletingId === request.id}
+                                disabled={isLoading(`delete-request:${request.id}`)}
                                 title="Delete pending request"
                                 aria-label={`Delete ${request.serviceType} request`}
                                 className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 transition hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
                               >
-                                {deletingId === request.id
+                                {isLoading(`delete-request:${request.id}`)
                                   ? <Loader2 className="h-4 w-4 animate-spin" />
                                   : <Trash2 className="h-4 w-4" />}
                               </button>
@@ -374,11 +376,11 @@ export function ResidentRequests({ user }: ResidentRequestsProps) {
                         <button
                           type="button"
                           onClick={() => void handleDeleteRequest(request)}
-                          disabled={deletingId === request.id}
+                          disabled={isLoading(`delete-request:${request.id}`)}
                           aria-label={`Delete ${request.serviceType} request`}
                           className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-lg text-slate-500 transition hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
                         >
-                          {deletingId === request.id
+                          {isLoading(`delete-request:${request.id}`)
                             ? <Loader2 className="h-4 w-4 animate-spin" />
                             : <Trash2 className="h-4 w-4" />}
                         </button>
@@ -526,10 +528,10 @@ export function ResidentRequests({ user }: ResidentRequestsProps) {
                 <button
                   type="button"
                   onClick={() => void handleDeleteRequest(selectedRequest)}
-                  disabled={deletingId === selectedRequest.id}
+                  disabled={isLoading(`delete-request:${selectedRequest.id}`)}
                   className="inline-flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:opacity-50"
                 >
-                  {deletingId === selectedRequest.id
+                  {isLoading(`delete-request:${selectedRequest.id}`)
                     ? <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />
                     : <Trash2 aria-hidden="true" className="h-4 w-4" />}
                   Delete pending request

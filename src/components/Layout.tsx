@@ -26,6 +26,7 @@ import {
   ChevronDown,
   UserRound,
   ShieldCheck,
+  Loader2,
 } from 'lucide-react';
 import { cn, formatTimeAgo } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
@@ -35,6 +36,7 @@ import { checkProfileCompletion } from '../lib/profileUtils';
 import { markNotificationReadInSupabase } from '../lib/supabaseSync';
 import { getNotificationTargetUserIds } from '../lib/notificationScope';
 import { isPrimaryAdmin } from '../lib/adminAccess';
+import { useLoadingActions } from '../hooks/useLoadingActions';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -50,6 +52,7 @@ export function Layout({ children, user, profile, onLogout }: LayoutProps) {
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
+  const { isLoading, startLoading, stopLoading } = useLoadingActions();
   const [searchQuery, setSearchQuery] = useState('');
   const [liveTime, setLiveTime] = useState('');
   const location = useLocation();
@@ -116,6 +119,7 @@ export function Layout({ children, user, profile, onLogout }: LayoutProps) {
   const handleMarkAllAsRead = async () => {
     const unreadNotifications = notifications.filter(n => !n.read);
     if (unreadNotifications.length === 0) return;
+    if (!startLoading('mark-all-notifications-read')) return;
 
     try {
       const results = await Promise.all(unreadNotifications.map(n => dbMarkNotificationRead(n.id)));
@@ -125,15 +129,23 @@ export function Layout({ children, user, profile, onLogout }: LayoutProps) {
       setNotifications(current => current.map(n => ({ ...n, read: true })));
     } catch (error) {
       console.error("Error marking all as read:", error);
+    } finally {
+      stopLoading('mark-all-notifications-read');
     }
   };
 
   const handleNotificationClick = async (id: string) => {
+    const action = `mark-notification-read:${id}`;
+    if (!startLoading(action)) return;
     try {
-      await dbMarkNotificationRead(id);
+      if (!(await dbMarkNotificationRead(id))) {
+        throw new Error('The notification could not be updated.');
+      }
       setNotifications(current => current.map(n => n.id === id ? { ...n, read: true } : n));
     } catch (error) {
       console.error("Error marking notification as read:", error);
+    } finally {
+      stopLoading(action);
     }
   };
 
@@ -482,9 +494,11 @@ export function Layout({ children, user, profile, onLogout }: LayoutProps) {
                         </div>
                         <button 
                           onClick={handleMarkAllAsRead}
-                          className="text-xs font-semibold text-[#2563EB] dark:text-blue-400 hover:underline cursor-pointer"
+                          disabled={isLoading('mark-all-notifications-read') || unreadCount === 0}
+                          className="inline-flex items-center gap-1 text-xs font-semibold text-[#2563EB] dark:text-blue-400 hover:underline cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                         >
-                          Mark all as read
+                          {isLoading('mark-all-notifications-read') && <Loader2 className="h-3 w-3 animate-spin" />}
+                          {isLoading('mark-all-notifications-read') ? 'Marking…' : 'Mark all as read'}
                         </button>
                       </div>
                       <div className="max-h-80 overflow-y-auto divide-y divide-[#E5E7EB] dark:divide-slate-800">
@@ -496,9 +510,11 @@ export function Layout({ children, user, profile, onLogout }: LayoutProps) {
                           notifications.map((n) => (
                             <div 
                               key={n.id} 
-                              onClick={() => handleNotificationClick(n.id)}
+                              onClick={() => !isLoading(`mark-notification-read:${n.id}`) && !n.read && handleNotificationClick(n.id)}
+                              aria-busy={isLoading(`mark-notification-read:${n.id}`)}
                               className={cn(
                                 "p-3 transition-colors cursor-pointer hover:bg-[#F8FAFC] dark:hover:bg-slate-800/80",
+                                isLoading(`mark-notification-read:${n.id}`) && "opacity-70",
                                 !n.read ? "bg-blue-50/50 dark:bg-blue-950/30" : ""
                               )}
                             >
@@ -513,7 +529,9 @@ export function Layout({ children, user, profile, onLogout }: LayoutProps) {
                                   <div className="flex items-center justify-between mb-0.5">
                                     <p className="text-xs font-semibold text-[#111827] dark:text-slate-100">{n.title}</p>
                                     {!n.read && (
-                                      <span className="w-2 h-2 rounded-full bg-[#2563EB]" />
+                                      isLoading(`mark-notification-read:${n.id}`)
+                                        ? <Loader2 className="h-3 w-3 animate-spin text-[#2563EB]" />
+                                        : <span className="w-2 h-2 rounded-full bg-[#2563EB]" />
                                     )}
                                   </div>
                                   <p className="text-[11px] text-[#6B7280] dark:text-slate-400 mb-1 leading-snug">{n.message}</p>

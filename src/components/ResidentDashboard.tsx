@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 
 import { Link, useNavigate } from 'react-router-dom';
 import { useSchedule } from '../hooks/useSchedule';
+import { useLoadingActions } from '../hooks/useLoadingActions';
 import { checkProfileCompletion, getAccountStatus } from '../lib/profileUtils';
 import { ProfileIncompleteModal } from './ProfileIncompleteModal';
 import { AccountStatusNoticeModal } from './AccountStatusNoticeModal';
@@ -72,7 +73,7 @@ export function ResidentDashboard({ user, profile }: ResidentDashboardProps) {
   const [showIncompleteModal, setShowIncompleteModal] = useState(false);
   const [requests, setRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [deletingRequestId, setDeletingRequestId] = useState<string | null>(null);
+  const { isLoading, startLoading, stopLoading } = useLoadingActions();
   const [showForm, setShowForm] = useState(false);
   const [initialService, setInitialService] = useState<string>('Barangay Clearance');
   const { schedule, getRecommendation, announcements } = useSchedule();
@@ -167,14 +168,15 @@ export function ResidentDashboard({ user, profile }: ResidentDashboardProps) {
   const handleDeleteRequest = async (request: any) => {
     if (!window.confirm(`Delete your pending ${request.serviceType} request? This cannot be undone.`)) return;
 
-    setDeletingRequestId(request.id);
+    const action = `delete-request:${request.id}`;
+    if (!startLoading(action)) return;
     try {
       await dbDeleteServiceRequest(request.id);
       setRequests(current => current.filter(item => item.id !== request.id));
     } catch (error: any) {
       window.alert(error?.message || 'The request could not be deleted. Please try again.');
     } finally {
-      setDeletingRequestId(null);
+      stopLoading(action);
     }
   };
 
@@ -318,18 +320,12 @@ export function ResidentDashboard({ user, profile }: ResidentDashboardProps) {
 
           {upcomingAppointment ? (
             <div className="pt-4 space-y-3 flex-1 flex flex-col justify-center">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-[#F8FAFC] dark:bg-slate-800/80 p-3.5 rounded-[10px] border border-[#E2E8F0] dark:border-slate-700">
+              <div className="bg-[#F8FAFC] dark:bg-slate-800/80 p-3.5 rounded-[10px] border border-[#E2E8F0] dark:border-slate-700">
                 <div>
                   <span className="text-[12px] text-[#64748B] dark:text-slate-400 block font-medium">Service Name</span>
                   <h3 className="text-[14px] font-bold text-[#0F172A] dark:text-slate-100">
                     {upcomingAppointment.serviceType}
                   </h3>
-                </div>
-                <div className="text-left sm:text-right">
-                  <span className="text-[12px] text-[#64748B] dark:text-slate-400 block font-medium">Designated Window</span>
-                  <span className="inline-block font-semibold text-[11px] text-[#2563EB] dark:text-blue-400 bg-[#EFF6FF] dark:bg-blue-950/80 px-2 py-0.5 rounded border border-blue-100 dark:border-blue-900 mt-0.5">
-                    Counter 2 (Document Release)
-                  </span>
                 </div>
               </div>
 
@@ -355,10 +351,7 @@ export function ResidentDashboard({ user, profile }: ResidentDashboardProps) {
                 </div>
               </div>
 
-              <div className="pt-2 flex items-center justify-between text-[12px] mt-auto">
-                <span className="text-[11px] text-[#64748B] dark:text-slate-400 hidden sm:inline-block">
-                  Please bring 1 valid ID for counter verification.
-                </span>
+              <div className="pt-1 flex justify-end text-[12px] mt-auto">
                 <Link
                   to="/requests"
                   className="inline-flex items-center gap-1 font-semibold text-[#2563EB] dark:text-blue-400 hover:underline ml-auto"
@@ -506,12 +499,12 @@ export function ResidentDashboard({ user, profile }: ResidentDashboardProps) {
                         <button
                           type="button"
                           onClick={() => handleDeleteRequest(req)}
-                          disabled={deletingRequestId === req.id}
+                          disabled={isLoading(`delete-request:${req.id}`)}
                           title="Delete pending request"
                           aria-label={`Delete ${req.serviceType} request`}
                           className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/50 rounded-md transition-colors disabled:opacity-50"
                         >
-                          {deletingRequestId === req.id
+                          {isLoading(`delete-request:${req.id}`)
                             ? <Loader2 className="w-4 h-4 animate-spin" />
                             : <Trash2 className="w-4 h-4" />}
                         </button>
