@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
-import { getRequestReference } from '../lib/requestPresentation';
+import { formatUnavailableSlotMessage, getRequestReference } from '../lib/requestPresentation';
 import { getAppointmentDateKey, type AvailableAppointmentSlot } from '../lib/appointmentAvailability';
 
 interface ResidentServicesProps {
@@ -159,9 +159,9 @@ export function ResidentServices({ user, profile }: ResidentServicesProps) {
       if (nextSlot) {
         setFormData(current => ({ ...current, appointmentDate: nextSlot.date, appointmentTime: nextSlot.time }));
         setRecommendation(nextSlot);
-        alert(`That time is no longer available. The next available slot is ${nextSlot.display}. Please press Submit Request again to confirm it.`);
+        alert(formatUnavailableSlotMessage(nextSlot.date, nextSlot.display));
       } else {
-        alert("There are no available administrator-defined appointment slots. Please choose another date.");
+        alert(formatUnavailableSlotMessage());
       }
       return;
     }

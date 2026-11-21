@@ -8,6 +8,7 @@ import { ProfileIncompleteModal } from './ProfileIncompleteModal';
 import { AccountStatusNoticeModal } from './AccountStatusNoticeModal';
 import { dbDeleteServiceRequest, dbGetServiceRequests, dbCreateServiceRequest, dbAddNotification } from '../lib/supabaseDb';
 import { supabase } from '../lib/supabase';
+import { formatUnavailableSlotMessage } from '../lib/requestPresentation';
 import { 
   FileText, 
   Clock, 
@@ -759,9 +760,9 @@ function ServiceRequestForm({
       if (nextSlot) {
         setFormData(current => ({ ...current, appointmentDate: nextSlot.date, appointmentTime: nextSlot.time }));
         setRecommendation(nextSlot);
-        alert(`That time is no longer available. The next available slot is ${nextSlot.display}. Please submit the request again to confirm it.`);
+        alert(formatUnavailableSlotMessage(nextSlot.date, nextSlot.display));
       } else {
-        alert('There are no available administrator-defined appointment slots. Please choose another date.');
+        alert(formatUnavailableSlotMessage());
       }
       return;
     }

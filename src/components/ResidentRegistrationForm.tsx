@@ -58,7 +58,7 @@ interface ResidentRegistrationFormProps {
   onSignIn: () => void;
 }
 
-const STEPS = ['Account Details', 'Personal Information', 'Identity Verification', 'Review and Submit'];
+const STEPS = ['Account Information', 'Personal Information', 'Identity Verification', 'Review and Submit'];
 const IMAGE_ACCEPT = 'image/jpeg,image/png,image/webp';
 const ID_TYPES = ['PhilSys National ID', "Driver's License", 'Passport', "Voter's ID", 'Other Accepted ID'];
 const ERROR_FIELD_IDS: Record<string, string> = {
@@ -391,13 +391,15 @@ export function ResidentRegistrationForm({
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const submitRegistration = (event: React.FormEvent) => {
+  const handleFormSubmit = (event: React.FormEvent) => {
     event.preventDefault();
-    if (isSubmitting) return;
     if (step < STEPS.length - 1) {
       continueStep();
-      return;
     }
+  };
+
+  const submitRegistration = () => {
+    if (isSubmitting || step !== STEPS.length - 1) return;
     if (!validateStep()) return;
     onSubmit({
       email: email.trim().toLowerCase(),
@@ -430,20 +432,18 @@ export function ResidentRegistrationForm({
   };
 
   return (
-    <form onSubmit={submitRegistration} className="auth-signup-form space-y-4">
+    <form onSubmit={handleFormSubmit} className="auth-signup-form registration-form space-y-4">
       <div className="mb-4">
-        <div className="flex items-center justify-between gap-1" aria-label={`Registration step ${step + 1} of ${STEPS.length}`}>
+        <div className="registration-stepper flex items-start justify-between gap-1" role="list" aria-label={`Registration step ${step + 1} of ${STEPS.length}`}>
           {STEPS.map((label, index) => (
-            <div key={label} className="flex min-w-0 flex-1 flex-col items-center gap-1.5">
-              <div className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold ${index < step ? 'bg-emerald-600 text-white' : index === step ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-600'}`}>
+            <div key={label} role="listitem" aria-current={index === step ? 'step' : undefined} className="relative flex min-w-0 flex-1 flex-col items-center gap-1.5">
+              {index > 0 && <span aria-hidden="true" className={`registration-step-connector absolute right-1/2 top-3.5 h-px w-full ${index <= step ? 'bg-emerald-600' : 'bg-slate-200'}`} />}
+              <div className={`relative z-10 flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold ring-4 ring-white ${index < step ? 'bg-emerald-600 text-white' : index === step ? 'bg-blue-800 text-white' : 'bg-slate-200 text-slate-600'}`}>
                 {index < step ? <Check className="h-4 w-4" /> : index + 1}
               </div>
-              <span className={`text-center text-[9px] leading-tight sm:text-[10px] ${index === step ? 'font-bold text-blue-700' : 'text-slate-500'}`}>{label}</span>
+              <span className={`relative z-10 max-w-full text-center text-[9px] leading-tight sm:text-[10px] ${index === step ? 'font-bold text-blue-900' : 'text-slate-500'}`}>{label}</span>
             </div>
           ))}
-        </div>
-        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-200">
-          <div className="h-full rounded-full bg-blue-600 transition-all" style={{ width: `${((step + 1) / STEPS.length) * 100}%` }} />
         </div>
       </div>
 
@@ -464,9 +464,9 @@ export function ResidentRegistrationForm({
       )}
 
       {step === 0 && (
-        <section aria-labelledby="registration-account-heading" className="space-y-4">
-          <div>
-            <h2 id="registration-account-heading" className="text-base font-bold text-slate-900">Account Details</h2>
+        <section aria-labelledby="registration-account-heading" className="registration-section space-y-4">
+          <div className="registration-section-title">
+            <h2 id="registration-account-heading" className="text-sm font-extrabold uppercase tracking-[0.12em] text-slate-900">Account Information</h2>
             <p className="text-xs text-slate-500">Create a secure resident account. Approval is completed by an administrator.</p>
           </div>
           {existingUser ? (
@@ -520,9 +520,9 @@ export function ResidentRegistrationForm({
       )}
 
       {step === 1 && (
-        <section aria-labelledby="registration-personal-heading" className="space-y-4">
-          <div>
-            <h2 id="registration-personal-heading" className="text-base font-bold text-slate-900">Personal Information</h2>
+        <section aria-labelledby="registration-personal-heading" className="registration-section space-y-4">
+          <div className="registration-section-title">
+            <h2 id="registration-personal-heading" className="text-sm font-extrabold uppercase tracking-[0.12em] text-slate-900">Personal Information</h2>
             <p className="text-xs text-slate-500">Enter your information as it appears on your valid ID.</p>
           </div>
           <Field label="Full Name" id="registration-full-name" error={errors.fullName}>
@@ -551,10 +551,13 @@ export function ResidentRegistrationForm({
             <Field label="Mobile Number" id="registration-mobile" error={errors.mobileNumber}>
               <input id="registration-mobile" type="tel" inputMode="numeric" autoComplete="tel-national" required pattern="09[0-9]{9}" maxLength={11} value={mobileNumber} onChange={event => setMobileNumber(event.target.value.replace(/\D/g, '').slice(0, 11))} placeholder="09XXXXXXXXX" className={inputClass} />
             </Field>
-            <Field label="House/Lot Number and Street (if applicable)" id="registration-house-street">
-              <input id="registration-house-street" autoComplete="street-address" value={houseStreet} onChange={event => setHouseStreet(event.target.value)} placeholder="House or street" className={inputClass} />
-            </Field>
           </div>
+          <div className="registration-subsection-title">
+            <h3 className="text-xs font-extrabold uppercase tracking-[0.12em] text-slate-800">Residential Information</h3>
+          </div>
+          <Field label="House/Lot Number and Street (if applicable)" id="registration-house-street">
+            <input id="registration-house-street" autoComplete="street-address" value={houseStreet} onChange={event => setHouseStreet(event.target.value)} placeholder="House or street" className={inputClass} />
+          </Field>
           <Field label="Purok or Sitio" id="registration-purok" error={errors.purokSitio}>
             <input id="registration-purok" required value={purokSitio} onChange={event => setPurokSitio(event.target.value)} className={inputClass} />
           </Field>
@@ -573,9 +576,9 @@ export function ResidentRegistrationForm({
       )}
 
       {step === 2 && (
-        <section aria-labelledby="registration-identity-heading" className="space-y-4">
-          <div>
-            <h2 id="registration-identity-heading" className="text-base font-bold text-slate-900">Identity Verification</h2>
+        <section aria-labelledby="registration-identity-heading" className="registration-section space-y-4">
+          <div className="registration-section-title">
+            <h2 id="registration-identity-heading" className="text-sm font-extrabold uppercase tracking-[0.12em] text-slate-900">Identity Verification</h2>
             <p className="text-xs text-slate-500">Readable, unexpired ID images help administrators review your residency. PDF files are not accepted.</p>
           </div>
 
@@ -603,6 +606,9 @@ export function ResidentRegistrationForm({
           </div>
 
           <fieldset disabled={!privacyConsent} className="space-y-4 disabled:opacity-60">
+            <div className="registration-subsection-title">
+              <h3 className="text-xs font-extrabold uppercase tracking-[0.12em] text-slate-800">Valid Identification</h3>
+            </div>
             <Field label="ID Type" id="registration-id-type" error={errors.idType}>
               <select id="registration-id-type" required value={idType} onChange={event => setIdType(event.target.value)} className={inputClass}>
                 <option value="">Select a valid ID</option>
@@ -620,9 +626,12 @@ export function ResidentRegistrationForm({
             {errors.idFront && <p className="text-xs font-medium text-red-700">{errors.idFront}</p>}
             <ImageUpload label="Back of ID (when applicable)" file={idBackFile} onChange={setIdBackFile} currentFileExists={Boolean(existingProfile?.id_back_path)} disabled={!privacyConsent} />
 
+            <div className="registration-subsection-title">
+              <h3 className="text-xs font-extrabold uppercase tracking-[0.12em] text-slate-800">Face Verification</h3>
+            </div>
             <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-3.5">
               <div>
-                <h3 className="text-sm font-bold text-slate-800">Face Verification</h3>
+                <h3 className="text-sm font-bold text-slate-800">Face Registration Photo</h3>
                 <p className="mt-1 text-xs leading-relaxed text-slate-600">Face the camera directly, use sufficient lighting, and remove obstructions where practical. This image is reviewed manually; no facial recognition is performed.</p>
               </div>
               {cameraActive && (
@@ -673,31 +682,51 @@ export function ResidentRegistrationForm({
       )}
 
       {step === 3 && (
-        <section aria-labelledby="registration-review-heading" className="space-y-4">
-          <div>
-            <h2 id="registration-review-heading" className="text-base font-bold text-slate-900">Review and Submit</h2>
+        <section aria-labelledby="registration-review-heading" className="registration-section space-y-4">
+          <div className="registration-section-title">
+            <h2 id="registration-review-heading" className="text-sm font-extrabold uppercase tracking-[0.12em] text-slate-900">Review and Submit</h2>
             <p className="text-xs text-slate-500">Check your details. Your account will remain Pending Approval until an administrator reviews it.</p>
           </div>
-          <div className="grid grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-white p-4 text-sm sm:grid-cols-2">
-            <ReviewItem label="Full Name" value={fullName} />
-            <ReviewItem label="Email" value={existingUser?.email || email} />
-            <ReviewItem label="Date of Birth / Age" value={`${dateOfBirth} · ${age ?? '—'} years`} />
-            <ReviewItem label="Mobile Number" value={mobileNumber} />
-            <ReviewItem label="Gender" value={gender} />
-            <ReviewItem label="Civil Status" value={civilStatus} />
-            <ReviewItem label="ID Type" value={idType === 'Other Accepted ID' ? idTypeOther : idType} />
-            <ReviewItem label="Front of ID" value={idFrontFile?.name || (existingProfile?.id_front_path ? 'Existing document on file' : 'Not provided')} />
-            <ReviewItem label="Back of ID" value={idBackFile?.name || (existingProfile?.id_back_path ? 'Existing document on file' : 'Not provided (optional)')} />
-            <ReviewItem label="Face Registration" value={faceMethod === 'in_person' ? 'In-person verification requested' : faceFile ? `${faceFile.name} (photo provided)` : 'Existing photo on file'} />
-            <div className="sm:col-span-2">
-              <ReviewItem label="Address" value={[houseStreet, purokSitio, barangay, municipalityCity, province].filter(Boolean).join(', ')} />
+          <div className="registration-review-group">
+            <h3 className="registration-review-title">ACCOUNT INFORMATION</h3>
+            <div className="grid grid-cols-1 gap-x-6 gap-y-4 text-sm sm:grid-cols-2">
+              <ReviewItem label="Email Address" value={existingUser?.email || email} />
+            </div>
+          </div>
+          <div className="registration-review-group">
+            <h3 className="registration-review-title">PERSONAL INFORMATION</h3>
+            <div className="grid grid-cols-1 gap-x-6 gap-y-4 text-sm sm:grid-cols-2">
+              <ReviewItem label="Full Name" value={fullName} />
+              <ReviewItem label="Date of Birth / Age" value={`${dateOfBirth} · ${age ?? '—'} years`} />
+              <ReviewItem label="Mobile Number" value={mobileNumber} />
+              <ReviewItem label="Gender" value={gender} />
+              <ReviewItem label="Civil Status" value={civilStatus} />
+            </div>
+          </div>
+          <div className="registration-review-group">
+            <h3 className="registration-review-title">RESIDENTIAL INFORMATION</h3>
+            <div className="grid grid-cols-1 gap-x-6 gap-y-4 text-sm sm:grid-cols-2">
+              <ReviewItem label="House / Street" value={houseStreet} />
+              <ReviewItem label="Purok / Sitio" value={purokSitio} />
+              <ReviewItem label="Barangay" value={barangay} />
+              <ReviewItem label="Municipality / City" value={municipalityCity} />
+              <ReviewItem label="Province" value={province} />
+            </div>
+          </div>
+          <div className="registration-review-group">
+            <h3 className="registration-review-title">IDENTITY VERIFICATION</h3>
+            <div className="grid grid-cols-1 gap-x-6 gap-y-4 text-sm sm:grid-cols-2">
+              <ReviewItem label="ID Type" value={idType === 'Other Accepted ID' ? idTypeOther : idType} />
+              <ReviewItem label="Front of ID" value={idFrontFile?.name || (existingProfile?.id_front_path ? 'Existing document on file' : 'Not provided')} />
+              <ReviewItem label="Back of ID" value={idBackFile?.name || (existingProfile?.id_back_path ? 'Existing document on file' : 'Not provided (optional)')} />
+              <ReviewItem label="Face Registration" value={faceMethod === 'in_person' ? 'In-person verification requested' : faceFile ? `${faceFile.name} (photo provided)` : 'Existing photo on file'} />
             </div>
           </div>
           {(idFrontPreview || idBackPreview || facePreview) && (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              {idFrontPreview && <img src={idFrontPreview} alt="Front of ID review preview" className="h-32 w-full rounded-lg border border-slate-200 bg-white object-contain" />}
-              {idBackPreview && <img src={idBackPreview} alt="Back of ID review preview" className="h-32 w-full rounded-lg border border-slate-200 bg-white object-contain" />}
-              {facePreview && <img src={facePreview} alt="Face photo review preview" className="h-32 w-full rounded-lg border border-slate-200 bg-white object-contain" />}
+              {idFrontPreview && <div className="registration-document-preview"><p>FRONT OF VALID ID</p><img src={idFrontPreview} alt="Front of ID review preview" /></div>}
+              {idBackPreview && <div className="registration-document-preview"><p>BACK OF ID</p><img src={idBackPreview} alt="Back of ID review preview" /></div>}
+              {facePreview && <div className="registration-document-preview"><p>FACE PHOTO</p><img src={facePreview} alt="Face photo review preview" /></div>}
             </div>
           )}
           <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-relaxed text-amber-900">
@@ -715,7 +744,7 @@ export function ResidentRegistrationForm({
             Continue <ArrowRight className="h-4 w-4" />
           </button>
         ) : (
-          <button type="submit" disabled={isSubmitting} className="flex min-h-11 items-center justify-center gap-2 rounded-lg bg-blue-600 px-5 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-60">
+          <button type="button" onClick={submitRegistration} disabled={isSubmitting} className="registration-submit-button flex min-h-11 items-center justify-center gap-2 rounded-lg bg-blue-600 px-5 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-60">
             {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
             Submit for Approval
           </button>
@@ -726,10 +755,11 @@ export function ResidentRegistrationForm({
 }
 
 function ReviewItem({ label, value }: { label: string; value: string }) {
+  const isMissing = !value.trim() || value === 'Not provided';
   return (
-    <div className="min-w-0">
+    <div className={`min-w-0 ${isMissing ? 'registration-review-missing' : ''}`}>
       <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">{label}</p>
-      <p className="mt-0.5 break-words font-semibold text-slate-900">{value || '—'}</p>
+      <p className="mt-0.5 break-words font-semibold text-slate-900">{value || 'Not provided'}</p>
     </div>
   );
 }

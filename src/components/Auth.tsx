@@ -759,7 +759,7 @@ export function Auth({
   };
 
   return (
-    <div className="auth-page min-h-screen w-full relative flex items-center justify-center overflow-x-hidden font-sans">
+    <div className={`auth-page min-h-screen w-full relative flex items-center justify-center overflow-x-hidden font-sans ${mode === 'signup' || mode === 'complete-profile' ? 'auth-registration-page' : ''}`}>
       <IntroBackground />
       {currentScreen !== 'auth' && (
         <motion.div
@@ -783,7 +783,7 @@ export function Auth({
           initial={{ opacity: 0, scale: 0.985, y: 12 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           transition={{ duration: prefersReducedMotion ? 0 : 0.45 }}
-          className="auth-scene relative z-10"
+          className={`auth-scene relative z-10 ${mode === 'signup' || mode === 'complete-profile' ? 'auth-registration-scene' : ''}`}
         >
           <AnimatePresence mode="wait" initial={false}>
             <motion.div
@@ -793,20 +793,20 @@ export function Auth({
               exit={{ opacity: 0, rotateY: flipDirection * 55 }}
               transition={{ duration: prefersReducedMotion ? 0 : 0.58, ease: [0.42, 0, 0.58, 1] }}
               style={{ transformStyle: 'preserve-3d', backfaceVisibility: 'hidden' }}
-              className="auth-card p-5 sm:p-8"
+              className={`auth-card p-5 sm:p-8 ${mode === 'signup' || mode === 'complete-profile' ? 'auth-registration-card' : ''}`}
             >
           {/* HEADER */}
-          <div className="auth-header flex flex-col items-center text-center mb-6 sm:mb-7">
+          <div className={`auth-header flex flex-col items-center text-center mb-6 sm:mb-7 ${mode === 'signup' || mode === 'complete-profile' ? 'auth-registration-header' : ''}`}>
             <motion.div
               initial={prefersReducedMotion ? false : { opacity: 0, scale: 0.92 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: prefersReducedMotion ? 0 : 0.45, ease: 'easeOut' }}
-              className="auth-logo w-[72px] h-[72px] sm:w-[76px] sm:h-[76px] mb-3 sm:mb-4 rounded-full bg-white border border-blue-100 flex items-center justify-center shadow-md shadow-blue-900/10"
+              className={`auth-logo w-[72px] h-[72px] sm:w-[76px] sm:h-[76px] mb-3 sm:mb-4 rounded-full bg-white border border-blue-100 flex items-center justify-center shadow-md shadow-blue-900/10 ${mode === 'signup' || mode === 'complete-profile' ? 'auth-registration-logo' : ''}`}
             >
               <img
                 src={BARANGAY_LOGO_URL}
                 alt="Barangay Pupua seal"
-                className="w-[64px] h-[64px] sm:w-[68px] sm:h-[68px] rounded-full object-cover"
+                className={`w-[64px] h-[64px] sm:w-[68px] sm:h-[68px] rounded-full object-cover ${mode === 'signup' || mode === 'complete-profile' ? 'auth-registration-seal' : ''}`}
                 onError={(e) => {
                   (e.target as HTMLImageElement).src = BARANGAY_LOGO_FALLBACK;
                 }}
@@ -814,19 +814,20 @@ export function Auth({
             </motion.div>
             <h2 className="text-[26px] sm:text-[28px] font-bold leading-tight text-slate-900 tracking-tight">
               {mode === 'login' && 'Welcome Back'}
-              {mode === 'signup' && 'Create Resident Account'}
+              {(mode === 'signup' || mode === 'complete-profile') && 'BARANGAY PUPUA'}
               {mode === 'forgot-password' && 'Reset Password'}
               {mode === 'verify-recovery-otp' && 'Verify Your Email'}
               {mode === 'update-password' && 'Choose a New Password'}
-              {mode === 'complete-profile' && 'Complete Resident Registration'}
             </h2>
+            {(mode === 'signup' || mode === 'complete-profile') && (
+              <span className="registration-form-subtitle">RESIDENT REGISTRATION FORM</span>
+            )}
             <p className="text-sm text-slate-500 mt-1">
               {mode === 'login' && 'Sign in to access your barangay portal'}
-              {mode === 'signup' && 'Register as a resident of Barangay Pupua'}
+              {(mode === 'signup' || mode === 'complete-profile') && 'Smart Public Service Portal'}
               {mode === 'forgot-password' && 'Enter your email to receive recovery instructions'}
               {mode === 'verify-recovery-otp' && 'Enter the 6-digit code sent to your email'}
               {mode === 'update-password' && 'Enter and confirm your new account password'}
-              {mode === 'complete-profile' && 'Finish your profile and identity verification for administrator review'}
             </p>
             {mode === 'login' && (
               <span className="auth-role mt-2 text-[13px] font-medium text-slate-500">

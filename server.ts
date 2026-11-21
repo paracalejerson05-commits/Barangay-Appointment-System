@@ -581,7 +581,7 @@ async function createApp() {
         }
         const suggestion = getNextAvailableAppointment(schedule, appointmentDate, bookings || [], now);
         return res.status(409).json({
-          error: 'The selected appointment time is no longer available.',
+          error: 'This appointment time is no longer available. Please review the next available slot and submit the request again.',
           suggestion: suggestion ? { date: suggestion.date, display: suggestion.display } : null
         });
       }

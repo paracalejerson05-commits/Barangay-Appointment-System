@@ -1,6 +1,6 @@
 import { supabase, isSupabaseConfigured } from './supabase';
 import { getNotificationTargetUserIds } from './notificationScope';
-import { getRequestReference } from './requestPresentation';
+import { formatUnavailableSlotMessage, getRequestReference } from './requestPresentation';
 import { apiUrl } from './api';
 
 /**
@@ -151,11 +151,14 @@ export async function dbCreateServiceRequest(req: {
         }
       });
     }
-    const suggestion = responseBody.suggestion?.date && responseBody.suggestion?.display
-      ? ` Next available: ${responseBody.suggestion.date} at ${responseBody.suggestion.display}.`
-      : '';
+    if (response.status === 409 && responseBody.error) {
+      throw new Error(formatUnavailableSlotMessage(
+        responseBody.suggestion?.date,
+        responseBody.suggestion?.display
+      ));
+    }
     throw new Error(responseBody.error
-      ? `${responseBody.error}${suggestion}`
+      ? responseBody.error
       : `Request failed with HTTP ${response.status}${responseBody.rawBody ? `: ${responseBody.rawBody.slice(0, 200)}` : '.'}`);
   }
   const result = responseBody;

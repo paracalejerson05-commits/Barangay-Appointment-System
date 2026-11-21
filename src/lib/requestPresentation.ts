@@ -12,3 +12,17 @@ export function getStatusLabel(status?: string): string {
     default: return 'Under Review';
   }
 }
+
+export function formatUnavailableSlotMessage(date?: string, display?: string): string {
+  if (!date || !display) {
+    return 'This appointment time is no longer available. Please choose another date and time, then submit the request again.';
+  }
+
+  const formattedDate = new Date(`${date}T00:00:00`).toLocaleDateString('en-PH', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+
+  return `This appointment time is no longer available. The next available slot is ${formattedDate} at ${display}. The form has been updated—please review the new schedule and submit the request again.`;
+}

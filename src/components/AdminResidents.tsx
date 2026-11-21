@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
-  Users, Search, UserPlus, Filter, MoreVertical, Eye, Edit, Trash2, 
+  Users, Search, UserPlus, Filter, MoreVertical, Eye, Trash2, 
   X, Loader2, ChevronLeft, ChevronRight, CheckCircle2, AlertCircle, XCircle,
   Check, Phone, MapPin, Calendar, Clock, UserCheck
 } from 'lucide-react';
@@ -353,10 +353,6 @@ export function AdminResidents({ residents, onAction }: AdminResidentsProps) {
     }
   };
 
-  const handleEdit = (resident: any) => {
-    setSelectedResident(resident);
-  };
-
   return (
     <div className="flex flex-col gap-3.5 sm:gap-5 w-full">
       {/* Directory intro */}
@@ -663,9 +659,7 @@ export function AdminResidents({ residents, onAction }: AdminResidentsProps) {
                         status={status}
                         onView={(r) => setSelectedResident(r)}
                         onApprove={handleApprove}
-                        isApproving={isLoading(residentActionKey('approve', resident))}
                         onReject={handleReject}
-                        onEdit={handleEdit}
                         onDeactivate={handleDeactivate}
                       />
                     </>
@@ -789,9 +783,7 @@ export function AdminResidents({ residents, onAction }: AdminResidentsProps) {
                             status={status}
                             onView={(r) => setSelectedResident(r)}
                             onApprove={handleApprove}
-                            isApproving={isLoading(residentActionKey('approve', resident))}
                             onReject={handleReject}
-                            onEdit={handleEdit}
                             onDeactivate={handleDeactivate}
                           />
                         </div>
@@ -1039,18 +1031,14 @@ function ActionMenu({
   status,
   onView, 
   onApprove,
-  isApproving,
   onReject,
-  onEdit, 
   onDeactivate 
 }: { 
   resident: any, 
   status: string,
   onView: (r: any) => void, 
   onApprove: (r: any) => void,
-  isApproving: boolean,
   onReject: (r: any) => void,
-  onEdit: (r: any) => void, 
   onDeactivate: (r: any) => void 
 }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -1101,23 +1089,6 @@ function ActionMenu({
               </button>
             </>
           )}
-
-          {status === 'inactive' && (
-            <button 
-              onClick={() => { setIsOpen(false); onApprove(resident); }} 
-              disabled={isApproving}
-              className="w-full text-left px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 flex items-center gap-2 cursor-pointer disabled:opacity-60"
-            >
-              {isApproving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />} Reactivate / Approve
-            </button>
-          )}
-
-          <button 
-            onClick={() => { setIsOpen(false); onEdit(resident); }} 
-            className="w-full text-left px-3 py-2 text-xs font-medium text-[#0F172A] hover:bg-[#F8FAFC] flex items-center gap-2 cursor-pointer"
-          >
-            <Edit className="w-3.5 h-3.5 text-[#64748B]" /> Edit Details
-          </button>
 
           {!isAdminAccount ? (
             <button 
