@@ -4,6 +4,8 @@ import { motion } from 'motion/react';
 import { XCircle, Printer, Save, Download, RotateCcw, Loader2, AlertCircle } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { dbUpdateServiceRequest } from '../lib/supabaseDb';
+import { recordPaperUsage, type PaperUsageSubmission } from '../lib/paperUsage';
+import { getSheetsUsedForPrint } from '../lib/reportAnalytics';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import { ResidenceCertificate } from './certificates/ResidenceCertificate';
@@ -24,6 +26,8 @@ export default function CertificateEditor({ request, onClose, onComplete, initia
   const [isDownloading, setIsDownloading] = useState(false);
   const [isPrinting, setIsPrinting] = useState(false);
   const [actionError, setActionError] = useState('');
+  const [pendingPaperUsage, setPendingPaperUsage] = useState<PaperUsageSubmission | null>(null);
+  const [isRetryingPaperUsage, setIsRetryingPaperUsage] = useState(false);
   
   const isIndigency = request.serviceType === 'Certificate of Indigency';
   const isClearance = request.serviceType === 'Barangay Clearance';
@@ -82,6 +86,7 @@ export default function CertificateEditor({ request, onClose, onComplete, initia
   const [certData, setCertData] = useState(request.certificateData || generateDefaultData());
   const printRef = useRef<HTMLDivElement>(null);
   const previewAreaRef = useRef<HTMLDivElement>(null);
+  const printInProgressRef = useRef(false);
   const [previewScale, setPreviewScale] = useState(1);
   const [pageSize, setPageSize] = useState({ width: 794, height: 1123 });
 
@@ -139,25 +144,70 @@ export default function CertificateEditor({ request, onClose, onComplete, initia
   };
 
   const handlePrint = async () => {
+    if (printInProgressRef.current) return;
+    printInProgressRef.current = true;
     setActionError('');
-    if (!(await handleSave())) return;
+    if (!(await handleSave())) {
+      printInProgressRef.current = false;
+      return;
+    }
 
     setIsPrinting(true);
+    const idempotencyKey = crypto.randomUUID();
     const handleAfterPrint = async () => {
       window.removeEventListener('afterprint', handleAfterPrint);
-      if (!window.confirm('Did the document print successfully?')) {
+      if (!window.confirm('Did the document print successfully? The browser cannot verify that paper came out of the printer.')) {
         setActionError('Print was canceled or did not succeed. The request has not been marked as completed.');
         setIsPrinting(false);
+        printInProgressRef.current = false;
         return;
       }
+
+      const printedDocument = printRef.current?.querySelector<HTMLElement>('.certificate-a4');
+      const pageHeight = printedDocument?.offsetHeight || 0;
+      const pagesPrinted = pageHeight > 0
+        ? Math.max(1, Math.ceil(Math.max(printedDocument?.scrollHeight || 0, pageHeight) / pageHeight))
+        : 1;
+      const duplex = window.confirm('Was the document printed double-sided (duplex)? Select Cancel for single-sided printing.');
+      let sheetsUsed: number;
+      try {
+        sheetsUsed = getSheetsUsedForPrint(pagesPrinted, duplex);
+      } catch (error: any) {
+        setActionError(error?.message || 'The printed page count could not be recorded.');
+        setIsPrinting(false);
+        printInProgressRef.current = false;
+        return;
+      }
+      const paperUsage: PaperUsageSubmission = {
+        requestId: String(request.id),
+        pagesPrinted,
+        sheetsUsed,
+        idempotencyKey
+      };
+
+      let paperUsageError = '';
+      try {
+        await recordPaperUsage(paperUsage);
+      } catch (error: any) {
+        paperUsageError = error?.message || 'Paper usage could not be recorded.';
+        setPendingPaperUsage(paperUsage);
+      }
+
+      let completionError = '';
       try {
         await onComplete?.('PRINT');
-        onClose();
       } catch (error: any) {
-        setActionError(error?.message || 'The print action finished, but the request could not be marked completed.');
-      } finally {
-        setIsPrinting(false);
+        completionError = error?.message || 'The printed request could not be marked as completed.';
       }
+
+      if (paperUsageError || completionError) {
+        setActionError([paperUsageError, completionError].filter(Boolean).join(' '));
+      } else {
+        setIsPrinting(false);
+        onClose();
+      }
+      if (paperUsageError || completionError) setIsPrinting(false);
+      printInProgressRef.current = false;
     };
 
     window.addEventListener('afterprint', handleAfterPrint, { once: true });
@@ -166,7 +216,26 @@ export default function CertificateEditor({ request, onClose, onComplete, initia
     } catch (error) {
       window.removeEventListener('afterprint', handleAfterPrint);
       setIsPrinting(false);
+      printInProgressRef.current = false;
       setActionError('Unable to open the print dialog. The request has not been marked as completed.');
+    }
+  };
+
+  const handleRetryPaperUsage = async () => {
+    if (!pendingPaperUsage || isRetryingPaperUsage) return;
+    setIsRetryingPaperUsage(true);
+    try {
+      await recordPaperUsage(pendingPaperUsage);
+      setPendingPaperUsage(null);
+      setActionError(current => current.startsWith('Your administrator session')
+        || current.startsWith('Paper usage')
+        || current.startsWith('The print was confirmed')
+        ? ''
+        : current);
+    } catch (error: any) {
+      setActionError(error?.message || 'Paper usage could not be recorded. Please retry.');
+    } finally {
+      setIsRetryingPaperUsage(false);
     }
   };
 
@@ -268,6 +337,16 @@ export default function CertificateEditor({ request, onClose, onComplete, initia
               <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
               <span>{actionError}</span>
             </div>
+          )}
+          {pendingPaperUsage && (
+            <button
+              type="button"
+              onClick={handleRetryPaperUsage}
+              disabled={isRetryingPaperUsage}
+              className="col-span-2 md:col-span-1 w-full rounded-[6px] border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800 disabled:opacity-60"
+            >
+              {isRetryingPaperUsage ? 'Recording…' : 'Retry paper tracking without reprinting'}
+            </button>
           )}
           <button onClick={handleDownloadPDF} disabled={isDownloading || isPrinting || isSaving} className="w-full flex items-center justify-center gap-2 py-2 px-4 bg-white dark:bg-slate-800 border border-[#E2E8F0] dark:border-slate-700 rounded-[6px] text-[#0F172A] dark:text-slate-100 font-semibold text-sm hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors disabled:opacity-50">
             {isDownloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}

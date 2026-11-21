@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 
 import { 
   FileText, 
@@ -48,11 +48,12 @@ import {
   Line,
   Legend
 } from 'recharts';
-import { subDays, format, isSameDay } from 'date-fns';
+import { format } from 'date-fns';
 
 import { AdminReports } from './AdminReports';
 import { AdminResidents } from './AdminResidents';
 import CertificateEditor from './CertificateEditor';
+import { getServiceRequestTrend, type ServiceRequestTrendPeriod } from '../lib/serviceRequestTrend';
 
 interface AdminDashboardProps {
   user: any;
@@ -68,6 +69,7 @@ export function AdminDashboard({ user, profile }: AdminDashboardProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'approved' | 'completed' | 'disapproved'>('all');
   const [currentPage, setCurrentPage] = useState(1);
+  const [trendPeriod, setTrendPeriod] = useState<ServiceRequestTrendPeriod>('week');
 
   const isRequestsPage = location.pathname === '/requests';
   const isResidentsPage = location.pathname === '/residents';
@@ -149,25 +151,10 @@ export function AdminDashboard({ user, profile }: AdminDashboardProps) {
     { label: 'Total Residents', value: residents.length, icon: Users, color: 'slate' },
   ];
 
-  // Derived Analytics Data
-  const last7Days = Array.from({ length: 7 }, (_, i) => {
-    const d = subDays(new Date(), 6 - i);
-    return { date: d, label: format(d, 'MMM dd') };
-  });
-
-  const trendData = last7Days.map(d => {
-    const dayReqs = requests.filter(r => {
-      const rDate = parseToDate(r.createdAt);
-      return rDate && isSameDay(rDate, d.date);
-    });
-    return {
-      name: d.label,
-      Total: dayReqs.length,
-      Approved: dayReqs.filter(r => r.status === 'approved').length,
-      Completed: dayReqs.filter(r => r.status === 'completed').length,
-      Pending: dayReqs.filter(r => r.status === 'pending').length,
-    };
-  });
+  const serviceRequestTrend = useMemo(
+    () => getServiceRequestTrend(requests, trendPeriod),
+    [requests, trendPeriod]
+  );
 
   const pieData = [
     { name: 'Pending', value: requests.filter(r => r?.status === 'pending').length, color: '#f59e0b' },
@@ -324,16 +311,36 @@ export function AdminDashboard({ user, profile }: AdminDashboardProps) {
                 <div className="flex items-center justify-between mb-4 flex-shrink-0">
                   <div>
                     <h3 className="text-[14px] sm:text-[16px] font-bold text-[#0F172A] tracking-tight">Service Request Trend</h3>
-                    <p className="text-[11px] sm:text-[12px] text-[#64748B]">Last 7 days overview</p>
+                    <p className="text-[11px] sm:text-[12px] text-[#64748B]">{serviceRequestTrend.description}</p>
                   </div>
                   <div className="flex items-center gap-1 bg-[#F8FAFC] border border-[#E2E8F0] rounded-[6px] p-0.5">
-                    <button className="px-3 sm:px-2 py-1.5 sm:py-1 text-[11px] sm:text-[10px] font-semibold bg-white rounded-[4px] shadow-xs text-[#0F172A]">This Week</button>
-                    <button className="px-3 sm:px-2 py-1.5 sm:py-1 text-[11px] sm:text-[10px] font-semibold text-[#64748B] hover:text-[#0F172A]">This Month</button>
+                    <button
+                      type="button"
+                      aria-pressed={trendPeriod === 'week'}
+                      onClick={() => setTrendPeriod('week')}
+                      className={cn(
+                        'px-3 sm:px-2 py-1.5 sm:py-1 text-[11px] sm:text-[10px] font-semibold rounded-[4px]',
+                        trendPeriod === 'week' ? 'bg-white shadow-xs text-[#0F172A]' : 'text-[#64748B] hover:text-[#0F172A]'
+                      )}
+                    >
+                      This Week
+                    </button>
+                    <button
+                      type="button"
+                      aria-pressed={trendPeriod === 'month'}
+                      onClick={() => setTrendPeriod('month')}
+                      className={cn(
+                        'px-3 sm:px-2 py-1.5 sm:py-1 text-[11px] sm:text-[10px] font-semibold rounded-[4px]',
+                        trendPeriod === 'month' ? 'bg-white shadow-xs text-[#0F172A]' : 'text-[#64748B] hover:text-[#0F172A]'
+                      )}
+                    >
+                      This Month
+                    </button>
                   </div>
                 </div>
                 <div className="flex-1 min-h-0">
                   <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={trendData} margin={{ top: 5, right: 10, left: -25, bottom: 0 }}>
+                    <LineChart data={serviceRequestTrend.data} margin={{ top: 5, right: 10, left: -25, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
                       <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748B' }} dy={10} />
                       <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748B' }} />
@@ -344,6 +351,8 @@ export function AdminDashboard({ user, profile }: AdminDashboardProps) {
                       <Line type="monotone" dataKey="Total" stroke="#94A3B8" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
                       <Line type="monotone" dataKey="Completed" stroke="#10b981" strokeWidth={2} dot={{ r: 3 }} />
                       <Line type="monotone" dataKey="Pending" stroke="#f59e0b" strokeWidth={2} dot={{ r: 3 }} />
+                      <Line type="monotone" dataKey="Approved" stroke="#2563eb" strokeWidth={2} dot={{ r: 3 }} />
+                      <Line type="monotone" dataKey="Disapproved" stroke="#ef4444" strokeWidth={2} dot={{ r: 3 }} />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>

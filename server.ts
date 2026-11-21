@@ -8,6 +8,7 @@ import { createClient } from "@supabase/supabase-js";
 import { GoogleGenAI } from "@google/genai";
 import { getAvailableAppointmentSlots, getNextAvailableAppointment, getAppointmentDateKey, isAppointmentDateAvailable, isAppointmentSlotAvailable, isAppointmentTimeInSchedule, normalizeTime } from "./src/lib/appointmentAvailability";
 import { buildFallbackReply, getGeminiConnectionStatus, getGeminiRetryAfterMs, getGeminiRetryDelay, isRetryableGeminiError } from "./src/lib/chatReliability";
+import { getReportingPeriodBounds } from "./src/lib/reportAnalytics";
 
 dotenv.config();
 
@@ -803,6 +804,127 @@ async function createApp() {
           return res.status(500).json({
             error: 'The document action succeeded, but the request could not be marked completed. Please try the action again.'
           });
+        }
+      });
+
+      app.get('/api/admin/reports/paper-usage', async (req, res) => {
+        if (!await requireAdmin(req, res)) return;
+
+        const yearValue = Array.isArray(req.query.year) ? req.query.year[0] : req.query.year;
+        const monthValue = Array.isArray(req.query.month) ? req.query.month[0] : req.query.month;
+        if (typeof yearValue !== 'string' || !/^\d{4}$/.test(yearValue)) {
+          return res.status(400).json({ error: 'A valid reporting year is required.' });
+        }
+
+        const year = Number(yearValue);
+        const month = monthValue === undefined || monthValue === 'All' ? undefined : Number(monthValue);
+        if (!Number.isInteger(year) || year < 1900 || year > 9998) {
+          return res.status(400).json({ error: 'Reporting year must be from 1900 through 9998.' });
+        }
+        if (monthValue !== undefined && monthValue !== 'All'
+          && (!/^\d{1,2}$/.test(String(monthValue)) || !Number.isInteger(month) || month < 1 || month > 12)) {
+          return res.status(400).json({ error: 'Reporting month must be All or a number from 1 to 12.' });
+        }
+
+        try {
+          const bounds = getReportingPeriodBounds(year, month);
+          const requestClient = getRequestSupabaseClient(req);
+          const records: any[] = [];
+          const pageSize = 1000;
+          for (let offset = 0; ; offset += pageSize) {
+            const { data, error } = await requestClient
+              .from('paper_usage_records')
+              .select('id, request_id, resident_id, resident_name, service_type, document_type, pages_printed, sheets_used, printed_at, admin_user_id, admin_name')
+              .gte('printed_at', bounds.from)
+              .lt('printed_at', bounds.to)
+              .order('printed_at', { ascending: true })
+              .range(offset, offset + pageSize - 1);
+            if (error) throw error;
+            records.push(...(data || []));
+            if (!data || data.length < pageSize) break;
+          }
+
+          return res.status(200).json({
+            records: records.map(record => ({
+              id: record.id,
+              requestId: record.request_id,
+              residentId: record.resident_id,
+              residentName: record.resident_name,
+              serviceType: record.service_type,
+              documentType: record.document_type,
+              pagesPrinted: record.pages_printed,
+              sheetsUsed: record.sheets_used,
+              printedAt: record.printed_at,
+              adminUserId: record.admin_user_id,
+              adminName: record.admin_name
+            }))
+          });
+        } catch (error: any) {
+          console.error('[Paper Usage] Failed to load printing records:', error?.message || error);
+          return res.status(500).json({ error: 'Paper usage records could not be loaded. Verify that database_paper_usage.sql has been applied.' });
+        }
+      });
+
+      app.post('/api/admin/reports/paper-usage', async (req, res) => {
+        const adminUser = await requireAdmin(req, res);
+        if (!adminUser) return;
+
+        const { requestId, pagesPrinted, sheetsUsed, idempotencyKey } = req.body || {};
+        if (typeof requestId !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestId)) {
+          return res.status(400).json({ error: 'A valid service request ID is required.' });
+        }
+        if (typeof idempotencyKey !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(idempotencyKey)) {
+          return res.status(400).json({ error: 'A valid print event ID is required.' });
+        }
+        if (!Number.isInteger(pagesPrinted) || pagesPrinted < 1 || pagesPrinted > 100
+          || !Number.isInteger(sheetsUsed)
+          || ![pagesPrinted, Math.ceil(pagesPrinted / 2)].includes(sheetsUsed)) {
+          return res.status(400).json({ error: 'Page and sheet counts are invalid. Sheets must match single-sided or duplex printing.' });
+        }
+
+        try {
+          const requestClient = getRequestSupabaseClient(req);
+          const [{ data: request, error: requestError }, { data: adminProfile, error: adminProfileError }] = await Promise.all([
+            requestClient
+              .from('service_requests')
+              .select('id, resident_id, resident_name, service_type, status')
+              .eq('id', requestId)
+              .maybeSingle(),
+            requestClient
+              .from('users')
+              .select('display_name')
+              .eq('id', adminUser.id)
+              .maybeSingle()
+          ]);
+          if (requestError) throw requestError;
+          if (adminProfileError) throw adminProfileError;
+          if (!request) return res.status(404).json({ error: 'The service request for this document could not be found.' });
+          if (!['approved', 'completed'].includes(request.status)) {
+            return res.status(409).json({ error: 'Only approved or completed requests can have official documents recorded as printed.' });
+          }
+
+          const { data, error } = await requestClient
+            .from('paper_usage_records')
+            .upsert({
+              idempotency_key: idempotencyKey,
+              request_id: request.id,
+              resident_id: request.resident_id,
+              resident_name: request.resident_name || 'Resident',
+              service_type: request.service_type,
+              document_type: request.service_type,
+              pages_printed: pagesPrinted,
+              sheets_used: sheetsUsed,
+              admin_user_id: adminUser.id,
+              admin_name: adminProfile?.display_name || adminUser.email || 'Administrator'
+            }, { onConflict: 'idempotency_key', ignoreDuplicates: true })
+            .select('id')
+            .maybeSingle();
+          if (error) throw error;
+
+          return res.status(200).json({ success: true, duplicate: !data });
+        } catch (error: any) {
+          console.error('[Paper Usage] Failed to save print event:', error?.message || error);
+          return res.status(500).json({ error: 'The print was confirmed, but its paper usage could not be recorded.' });
         }
       });
 

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   FileText, 
   Download, 
@@ -29,36 +29,106 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { parseToDate } from '../lib/utils';
 import { useLoadingActions } from '../hooks/useLoadingActions';
+import { apiUrl } from '../lib/api';
+import { supabase } from '../lib/supabase';
+import {
+  calculateServiceProcessingPerformance,
+  formatProcessingDuration,
+  getPaperUsageAnalytics,
+  getPhilippinesYearMonth,
+  REPORT_MONTHS,
+  type PaperUsageRecord
+} from '../lib/reportAnalytics';
 
-const getRecordedPaperSheets = (request: any): number | null => {
-  const value = request.paperSheetsUsed ?? request.paperUsage;
-  return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null;
-};
+function formatReportDate(value: unknown, includeTime = false): string {
+  const date = parseToDate(value);
+  if (!date) return '';
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Manila',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    ...(includeTime ? { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' as const } : {})
+  }).formatToParts(date);
+  const part = (type: string) => parts.find(item => item.type === type)?.value || '';
+  const day = `${part('year')}-${part('month')}-${part('day')}`;
+  return includeTime ? `${day} ${part('hour')}:${part('minute')}` : day;
+}
 
 export function AdminReports({ requests, residents }: { requests: any[], residents: any[] }) {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
   const [selectedMonth, setSelectedMonth] = useState('All');
   const [exportError, setExportError] = useState('');
+  const [paperRecords, setPaperRecords] = useState<PaperUsageRecord[]>([]);
+  const [paperUsageLoading, setPaperUsageLoading] = useState(true);
+  const [paperUsageError, setPaperUsageError] = useState('');
+  const [paperUsagePeriod, setPaperUsagePeriod] = useState('');
   const { isLoading, startLoading, stopLoading } = useLoadingActions();
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === 'dark';
 
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const months = REPORT_MONTHS;
+  const selectedPeriodKey = `${selectedYear}:${selectedMonth}`;
+  const paperUsageIsCurrent = paperUsagePeriod === selectedPeriodKey;
+  const reportYears = useMemo(() => Array.from(new Set([
+    String(new Date().getFullYear()),
+    selectedYear,
+    ...requests.map(request => getPhilippinesYearMonth(request.createdAt)?.year.toString()).filter((year): year is string => Boolean(year))
+  ])).sort((a, b) => Number(b) - Number(a)), [requests, selectedYear]);
+
+  useEffect(() => {
+    let active = true;
+    const periodKey = `${selectedYear}:${selectedMonth}`;
+    setPaperRecords([]);
+    setPaperUsageError('');
+    setPaperUsageLoading(true);
+
+    const loadPaperUsage = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.access_token) throw new Error('Your administrator session has expired.');
+        const month = selectedMonth === 'All' ? 'All' : String(months.indexOf(selectedMonth) + 1);
+        const query = new URLSearchParams({ year: selectedYear, month });
+        const response = await fetch(apiUrl(`/api/admin/reports/paper-usage?${query}`), {
+          headers: { Authorization: `Bearer ${session.access_token}` }
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok || !Array.isArray(result.records)) {
+          throw new Error(result.error || `Paper usage could not be loaded (HTTP ${response.status}).`);
+        }
+        if (active) {
+          setPaperRecords(result.records);
+          setPaperUsagePeriod(periodKey);
+        }
+      } catch (error) {
+        console.error('[Admin Reports] Could not load paper usage:', error);
+        if (active) {
+          setPaperUsageError(error instanceof Error ? error.message : 'Paper usage could not be loaded.');
+          setPaperUsagePeriod(periodKey);
+        }
+      } finally {
+        if (active) setPaperUsageLoading(false);
+      }
+    };
+
+    void loadPaperUsage();
+    return () => { active = false; };
+  }, [selectedYear, selectedMonth]);
 
   // Centralized Data Processing
   const processedData = useMemo(() => {
     // 1. Filter requests by selected year
     const yearFiltered = requests.filter(req => {
-      const date = parseToDate(req.createdAt);
-      return date ? date.getFullYear().toString() === selectedYear : false;
+      const date = getPhilippinesYearMonth(req.createdAt);
+      return date ? date.year.toString() === selectedYear : false;
     });
 
     // 2. Further filter by month if selected
     const finalFiltered = selectedMonth === 'All' 
       ? yearFiltered 
       : yearFiltered.filter(req => {
-          const date = parseToDate(req.createdAt);
-          return date ? months[date.getMonth()] === selectedMonth : false;
+          const date = getPhilippinesYearMonth(req.createdAt);
+          return date ? months[date.month - 1] === selectedMonth : false;
         });
 
     // 3. Calculate Summary Stats
@@ -71,26 +141,12 @@ export function AdminReports({ requests, residents }: { requests: any[], residen
       approved: finalFiltered.filter(r => normalizedStatus(r) === 'approved').length,
       disapproved: finalFiltered.filter(r => normalizedStatus(r) === 'disapproved').length
     };
-    const scheduledAppointments = finalFiltered.filter(
-      r => Boolean(r.appointmentDate) && ['pending', 'approved', 'completed'].includes(normalizedStatus(r))
-    ).length;
-    const completedAppointments = finalFiltered.filter(
-      r => Boolean(r.appointmentDate) && normalizedStatus(r) === 'completed'
-    ).length;
-    const cancelledOrMissedAppointments = finalFiltered.filter(
-      r => Boolean(r.appointmentDate) && ['cancelled', 'canceled', 'missed'].includes(normalizedStatus(r))
-    ).length;
-    const hasCancelledOrMissedStatus = finalFiltered.some(
-      r => ['cancelled', 'canceled', 'missed'].includes(normalizedStatus(r))
-    );
-
     // 4. Monthly Performance Trends
     const monthlyTrends = months.map((m, idx) => {
       const monthRequests = yearFiltered.filter(req => {
-        const date = parseToDate(req.createdAt);
-        return date ? date.getMonth() === idx : false;
+        const date = getPhilippinesYearMonth(req.createdAt);
+        return date ? date.month === idx + 1 : false;
       });
-      const monthPaperSheets = monthRequests.map(getRecordedPaperSheets);
       
       return {
         month: m,
@@ -98,10 +154,7 @@ export function AdminReports({ requests, residents }: { requests: any[], residen
         completed: monthRequests.filter(r => normalizedStatus(r) === 'completed').length,
         pending: monthRequests.filter(r => normalizedStatus(r) === 'pending').length,
         approved: monthRequests.filter(r => normalizedStatus(r) === 'approved').length,
-        disapproved: monthRequests.filter(r => normalizedStatus(r) === 'disapproved').length,
-        paper: monthRequests.length > 0 && monthPaperSheets.every(sheets => sheets !== null)
-          ? monthPaperSheets.reduce<number>((total, sheets) => total + (sheets ?? 0), 0)
-          : null
+        disapproved: monthRequests.filter(r => normalizedStatus(r) === 'disapproved').length
       };
     });
 
@@ -114,43 +167,33 @@ export function AdminReports({ requests, residents }: { requests: any[], residen
     const requestsByService = Object.entries(serviceGroups)
       .map(([service, count]) => ({ service, requests: count }))
       .sort((a, b) => b.requests - a.requests || a.service.localeCompare(b.service));
-    const recordedPaperValues = finalFiltered.map(getRecordedPaperSheets);
-    const paperUsage = finalFiltered.length > 0 && recordedPaperValues.every(sheets => sheets !== null)
-      ? recordedPaperValues.reduce<number>((total, sheets) => total + (sheets ?? 0), 0)
-      : null;
-    const paperByService = paperUsage !== null
-      ? Object.entries(finalFiltered.reduce<Record<string, number[]>>((groups, request) => {
-          const sheets = getRecordedPaperSheets(request);
-          if (sheets !== null) {
-            const service = request.serviceType || 'Other';
-            (groups[service] ||= []).push(sheets);
-          }
-          return groups;
-        }, {})).map(([service, values]) => ({
-          service,
-          paper: values.reduce((total, sheets) => total + sheets, 0)
-        }))
-      : [];
-
     return {
       finalFiltered,
       totalRequests,
       uniqueResidents,
       statusSummary,
-      scheduledAppointments,
-      completedAppointments,
-      cancelledOrMissedAppointments: hasCancelledOrMissedStatus ? cancelledOrMissedAppointments : null,
-      paperUsage,
       monthlyTrends,
       requestsByService,
-      paperByService,
       mostRequestedService: requestsByService[0] || null
     };
   }, [requests, selectedYear, selectedMonth]);
 
+  const processingPerformance = useMemo(
+    () => calculateServiceProcessingPerformance(processedData.finalFiltered),
+    [processedData.finalFiltered]
+  );
+  const paperAnalytics = useMemo(() => getPaperUsageAnalytics(paperRecords), [paperRecords]);
+  const paperByMonth = useMemo(
+    () => new Map(paperAnalytics.monthly.map(data => [data.month, data])),
+    [paperAnalytics.monthly]
+  );
+
   const filteredMonthlyData = selectedMonth === 'All' 
     ? processedData.monthlyTrends 
     : processedData.monthlyTrends.filter(d => d.month === selectedMonth);
+  const filteredPaperMonthlyData = selectedMonth === 'All'
+    ? paperAnalytics.monthly
+    : paperAnalytics.monthly.filter(data => data.month === selectedMonth);
   const highestMonthlyRequestCount = Math.max(
     ...filteredMonthlyData.map(data => data.requests),
     0
@@ -184,18 +227,21 @@ export function AdminReports({ requests, residents }: { requests: any[], residen
     pending: filteredMonthlyData.reduce((total, data) => total + data.pending, 0),
     approved: filteredMonthlyData.reduce((total, data) => total + data.approved, 0),
     disapproved: filteredMonthlyData.reduce((total, data) => total + data.disapproved, 0),
-    paper: selectedMonth === 'All'
-      ? processedData.paperUsage
-      : filteredMonthlyData[0]?.paper ?? null
+    paper: paperAnalytics.totalSheets,
+    paperDocuments: paperAnalytics.totalDocuments
   });
 
   // Export Functions
   const handleExportExcel = async () => {
+    if (!paperUsageIsCurrent || paperUsageLoading || paperUsageError) {
+      setExportError(paperUsageError || 'Wait for paper usage data to finish loading before exporting.');
+      return;
+    }
     if (!startLoading('export-excel')) return;
     setExportError('');
     try {
       await new Promise<void>(resolve => window.requestAnimationFrame(() => resolve()));
-      const generatedAt = new Date();
+      const generatedAt = formatReportDate(new Date(), true);
       const monthLabel = selectedMonth === 'All' ? 'All Months' : months[months.indexOf(selectedMonth)];
       const totals = getMonthlyTotals();
       const summarySheet = XLSX.utils.aoa_to_sheet([
@@ -209,15 +255,18 @@ export function AdminReports({ requests, residents }: { requests: any[], residen
         ['Pending requests', processedData.statusSummary.pending],
         ['Approved requests', processedData.statusSummary.approved],
         ['Disapproved requests', processedData.statusSummary.disapproved],
+        ['Total processed requests', processingPerformance.totalProcessed],
+        ['Completion rate', processingPerformance.completionRate / 100],
+        ['Average processing time', formatProcessingDuration(processingPerformance.averageProcessingMs)],
+        ['Awaiting review', processingPerformance.pending],
         ['Residents served', processedData.uniqueResidents],
         ['Most requested service', processedData.mostRequestedService?.service || 'No requests'],
         ['Most requested service count', processedData.mostRequestedService?.requests ?? 0],
-        ['Paper sheets used', processedData.paperUsage ?? 'Not recorded'],
-        ['Scheduled appointments', processedData.scheduledAppointments],
-        ['Completed appointments', processedData.completedAppointments],
-        ['Cancelled or missed appointments', processedData.cancelledOrMissedAppointments ?? 'Not tracked']
+        ['Total documents printed', paperAnalytics.totalDocuments],
+        ['Total paper sheets used', paperAnalytics.totalSheets],
+        ['Paper usage measurement', 'Admin-confirmed browser print; physical output is not verified']
       ]);
-      summarySheet['B3'].z = 'yyyy-mm-dd hh:mm';
+      summarySheet['B12'].z = '0%';
       summarySheet['!cols'] = [{ wch: 34 }, { wch: 28 }];
 
       const monthlySheet = XLSX.utils.json_to_sheet([
@@ -228,8 +277,10 @@ export function AdminReports({ requests, residents }: { requests: any[], residen
           Pending: data.pending,
           Approved: data.approved,
           Disapproved: data.disapproved,
-          'Paper sheets used': data.paper ?? 'Not recorded',
-          'Completion rate': data.requests > 0 ? data.completed / data.requests : 0
+          'Total processed requests': data.completed + data.disapproved,
+          'Paper documents printed': paperByMonth.get(data.month)?.documents || 0,
+          'Paper sheets used': paperByMonth.get(data.month)?.sheets || 0,
+          'Completion rate': data.completed + data.disapproved > 0 ? data.completed / (data.completed + data.disapproved) : 0
         })),
         {
           Month: 'Total',
@@ -238,16 +289,18 @@ export function AdminReports({ requests, residents }: { requests: any[], residen
           Pending: totals.pending,
           Approved: totals.approved,
           Disapproved: totals.disapproved,
-          'Paper sheets used': totals.paper ?? 'Not recorded',
-          'Completion rate': totals.requests > 0 ? totals.completed / totals.requests : 0
+          'Total processed requests': processingPerformance.totalProcessed,
+          'Paper documents printed': totals.paperDocuments,
+          'Paper sheets used': totals.paper,
+          'Completion rate': processingPerformance.completionRate / 100
         }
       ]);
       monthlySheet['!cols'] = [
-        { wch: 14 }, { wch: 18 }, { wch: 13 }, { wch: 13 },
-        { wch: 13 }, { wch: 15 }, { wch: 20 }, { wch: 18 }
+        { wch: 14 }, { wch: 18 }, { wch: 13 }, { wch: 13 }, { wch: 13 },
+        { wch: 15 }, { wch: 22 }, { wch: 24 }, { wch: 20 }, { wch: 18 }
       ];
       for (let row = 2; row <= filteredMonthlyData.length + 2; row += 1) {
-        const cell = monthlySheet[`H${row}`];
+        const cell = monthlySheet[`J${row}`];
         if (cell) cell.z = '0%';
       }
 
@@ -262,7 +315,7 @@ export function AdminReports({ requests, residents }: { requests: any[], residen
 
       const requestHeaders = [
         'Reference number', 'Resident name', 'Service type', 'Status', 'Request date',
-        'Appointment date', 'Appointment time', 'Queue number', 'Paper sheets used', 'Admin notes'
+        'Appointment date', 'Appointment time', 'Queue number', 'Admin notes'
       ];
       const requestSheet = XLSX.utils.aoa_to_sheet([
         requestHeaders,
@@ -271,30 +324,56 @@ export function AdminReports({ requests, residents }: { requests: any[], residen
           request.residentName || '',
           request.serviceType || 'Other',
           request.status || '',
-          parseToDate(request.createdAt) || '',
-          parseToDate(request.appointmentDate) || '',
+          formatReportDate(request.createdAt, true),
+          formatReportDate(request.appointmentDate),
           request.appointmentTime || '',
           request.queueNumber ?? '',
-          getRecordedPaperSheets(request) ?? 'Not recorded',
           request.adminNotes || ''
         ])
       ]);
       requestSheet['!cols'] = [
         { wch: 22 }, { wch: 28 }, { wch: 28 }, { wch: 16 }, { wch: 16 },
-        { wch: 18 }, { wch: 18 }, { wch: 14 }, { wch: 20 }, { wch: 48 }
+        { wch: 18 }, { wch: 18 }, { wch: 14 }, { wch: 48 }
       ];
-      for (let row = 2; row <= processedData.finalFiltered.length + 1; row += 1) {
-        for (const column of ['E', 'F']) {
-          const cell = requestSheet[`${column}${row}`];
-          if (cell && cell.v instanceof Date) cell.z = 'yyyy-mm-dd';
-        }
-      }
-
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, summarySheet, 'Summary');
       XLSX.utils.book_append_sheet(workbook, monthlySheet, 'Monthly Breakdown');
       XLSX.utils.book_append_sheet(workbook, serviceSheet, 'Service Breakdown');
       XLSX.utils.book_append_sheet(workbook, requestSheet, 'Request Records');
+      XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet([
+        ...paperAnalytics.byService.map(data => ({
+          Service: data.service,
+          'Documents printed': data.documents,
+          'Pages printed': data.pages,
+          'Sheets used': data.sheets
+        })),
+        {
+          Service: 'Total',
+          'Documents printed': paperAnalytics.totalDocuments,
+          'Pages printed': paperRecords.reduce((total, record) => total + record.pagesPrinted, 0),
+          'Sheets used': paperAnalytics.totalSheets
+        }
+      ]), 'Paper by Service');
+      const printHistorySheet = XLSX.utils.aoa_to_sheet([
+        ['Printed at', 'Request ID', 'Resident name', 'Resident ID', 'Service type', 'Document type', 'Pages', 'Sheets', 'Administrator ID', 'Administrator'],
+        ...paperRecords.map(record => [
+          formatReportDate(record.printedAt, true),
+          record.requestId || '',
+          record.residentName,
+          record.residentId || '',
+          record.serviceType,
+          record.documentType,
+          record.pagesPrinted,
+          record.sheetsUsed,
+          record.adminUserId || '',
+          record.adminName
+        ])
+      ]);
+      printHistorySheet['!cols'] = [
+        { wch: 22 }, { wch: 38 }, { wch: 26 }, { wch: 38 }, { wch: 28 },
+        { wch: 28 }, { wch: 10 }, { wch: 10 }, { wch: 38 }, { wch: 24 }
+      ];
+      XLSX.utils.book_append_sheet(workbook, printHistorySheet, 'Print History');
       XLSX.writeFile(workbook, `Barangay_Report_${selectedYear}_${selectedMonth}.xlsx`);
     } catch (error) {
       console.error('Error exporting Excel report:', error);
@@ -305,6 +384,10 @@ export function AdminReports({ requests, residents }: { requests: any[], residen
   };
 
   const handleExportPDF = async () => {
+    if (!paperUsageIsCurrent || paperUsageLoading || paperUsageError) {
+      setExportError(paperUsageError || 'Wait for paper usage data to finish loading before exporting.');
+      return;
+    }
     if (!startLoading('export-pdf')) return;
     setExportError('');
     try {
@@ -332,7 +415,7 @@ export function AdminReports({ requests, residents }: { requests: any[], residen
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(9);
       doc.text(`Reporting period: ${monthLabel} ${selectedYear}`, left, 41);
-      doc.text(`Generated: ${generatedAt.toLocaleString()}`, left, 47);
+      doc.text(`Generated: ${generatedAt.toLocaleString('en-PH', { timeZone: 'Asia/Manila' })}`, left, 47);
 
       let cursorY = 56;
       const section = (title: string, head: string[], body: (string | number)[][], widths?: number[]) => {
@@ -366,22 +449,31 @@ export function AdminReports({ requests, residents }: { requests: any[], residen
         ['Pending requests', processedData.statusSummary.pending],
         ['Approved requests', processedData.statusSummary.approved],
         ['Disapproved requests', processedData.statusSummary.disapproved],
+        ['Total processed requests', processingPerformance.totalProcessed],
+        ['Completion rate', `${processingPerformance.completionRate.toFixed(1)}%`],
+        ['Average processing time', formatProcessingDuration(processingPerformance.averageProcessingMs)],
+        ['Awaiting review', processingPerformance.pending],
         ['Residents served', processedData.uniqueResidents],
         ['Most requested service', processedData.mostRequestedService?.service || 'No requests'],
         ['Most requested service count', processedData.mostRequestedService?.requests ?? 0],
-        ['Paper sheets used', processedData.paperUsage ?? 'Not recorded'],
-        ['Scheduled appointments', processedData.scheduledAppointments],
-        ['Completed appointments', processedData.completedAppointments],
-        ['Cancelled or missed appointments', processedData.cancelledOrMissedAppointments ?? 'Not tracked']
+        ['Total documents printed', paperAnalytics.totalDocuments],
+        ['Total paper sheets used', paperAnalytics.totalSheets],
+        ['Paper usage measurement', 'Admin-confirmed browser print; physical output is not verified']
       ], [100, 82]);
 
-      section('Monthly Service Requests', ['Month', 'Requests', 'Completed', 'Pending', 'Approved', 'Disapproved', 'Paper sheets', 'Complete %'], [
+      section('Monthly Service Requests and Paper Usage', ['Month', 'Requests', 'Completed', 'Pending', 'Approved', 'Disapproved', 'Processed', 'Documents printed', 'Paper sheets', 'Complete %'], [
         ...filteredMonthlyData.map(data => [
           data.month, data.requests, data.completed, data.pending, data.approved, data.disapproved,
-          data.paper ?? 'Not recorded', data.requests > 0 ? `${Math.round((data.completed / data.requests) * 100)}%` : '0%'
+          data.completed + data.disapproved,
+          paperByMonth.get(data.month)?.documents || 0,
+          paperByMonth.get(data.month)?.sheets || 0,
+          data.completed + data.disapproved > 0
+            ? `${Math.round((data.completed / (data.completed + data.disapproved)) * 100)}%`
+            : '0%'
         ]),
-        ['Total', totals.requests, totals.completed, totals.pending, totals.approved, totals.disapproved, totals.paper ?? 'Not recorded',
-          totals.requests > 0 ? `${Math.round((totals.completed / totals.requests) * 100)}%` : '0%']
+        ['Total', totals.requests, totals.completed, totals.pending, totals.approved, totals.disapproved,
+          processingPerformance.totalProcessed, totals.paperDocuments, totals.paper,
+          `${processingPerformance.completionRate.toFixed(1)}%`]
       ]);
 
       section('Service Breakdown', ['Service', 'Request count'], [
@@ -389,11 +481,32 @@ export function AdminReports({ requests, residents }: { requests: any[], residen
         ['Total requests', processedData.totalRequests]
       ], [130, 52]);
 
-      section('Appointment Summary', ['Metric', 'Value'], [
-        ['Scheduled appointments', processedData.scheduledAppointments],
-        ['Completed appointments', processedData.completedAppointments],
-        ['Cancelled or missed appointments', processedData.cancelledOrMissedAppointments ?? 'Not tracked']
+      section('Service Processing Performance', ['Metric', 'Value'], [
+        ['Total processed requests', processingPerformance.totalProcessed],
+        ['Completion rate', `${processingPerformance.completionRate.toFixed(1)}%`],
+        ['Average processing time', formatProcessingDuration(processingPerformance.averageProcessingMs)],
+        ['Awaiting review', processingPerformance.pending],
+        ['Completed', processingPerformance.completed],
+        ['Approved / Processing', processingPerformance.approved],
+        ['Pending', processingPerformance.pending],
+        ['Disapproved', processingPerformance.disapproved]
       ], [100, 82]);
+
+      section('Paper Usage by Service', ['Service', 'Documents printed', 'Pages printed', 'Sheets used'], [
+        ...paperAnalytics.byService.map(data => [data.service, data.documents, data.pages, data.sheets]),
+        ['Total', paperAnalytics.totalDocuments, paperRecords.reduce((total, record) => total + record.pagesPrinted, 0), paperAnalytics.totalSheets]
+      ]);
+      section('Print History', ['Printed at', 'Request ID', 'Resident', 'Resident ID', 'Service / Document', 'Pages', 'Sheets', 'Administrator ID', 'Administrator'], paperRecords.map(record => [
+        new Date(record.printedAt).toLocaleString('en-PH', { timeZone: 'Asia/Manila' }),
+        record.requestId || 'Request removed',
+        record.residentName,
+        record.residentId || 'Unavailable',
+        `${record.serviceType} / ${record.documentType}`,
+        record.pagesPrinted,
+        record.sheetsUsed,
+        record.adminUserId || 'Unavailable',
+        record.adminName
+      ]));
 
       if (cursorY > pageHeight - 30) {
         doc.addPage();
@@ -427,6 +540,10 @@ export function AdminReports({ requests, residents }: { requests: any[], residen
   };
 
   const handlePrint = () => {
+    if (!paperUsageIsCurrent || paperUsageLoading || paperUsageError) {
+      setExportError(paperUsageError || 'Wait for paper usage data to finish loading before printing.');
+      return;
+    }
     window.print();
   };
   const monthlyTotals = getMonthlyTotals();
@@ -450,8 +567,7 @@ export function AdminReports({ requests, residents }: { requests: any[], residen
               onChange={(e) => setSelectedYear(e.target.value)}
               className="bg-transparent text-xs font-semibold text-[#0F172A] outline-none"
             >
-              <option value="2025">2025</option>
-              <option value="2026">2026</option>
+              {reportYears.map(year => <option key={year} value={year}>{year}</option>)}
             </select>
           </div>
           
@@ -481,14 +597,15 @@ export function AdminReports({ requests, residents }: { requests: any[], residen
 
           <button 
             onClick={handlePrint}
-            className="flex min-h-9 items-center gap-1.5 rounded-[6px] border border-[#E2E8F0] bg-white px-3 py-1.5 text-xs font-semibold text-[#0F172A] shadow-sm transition-colors hover:bg-[#F8FAFC]"
+            disabled={!paperUsageIsCurrent || paperUsageLoading || Boolean(paperUsageError && paperUsageIsCurrent)}
+            className="flex min-h-9 items-center gap-1.5 rounded-[6px] border border-[#E2E8F0] bg-white px-3 py-1.5 text-xs font-semibold text-[#0F172A] shadow-sm transition-colors hover:bg-[#F8FAFC] disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Printer className="w-3.5 h-3.5" />
             Print
           </button>
           <button 
             onClick={handleExportExcel}
-            disabled={isLoading('export-excel')}
+            disabled={isLoading('export-excel') || !paperUsageIsCurrent || paperUsageLoading || Boolean(paperUsageError && paperUsageIsCurrent)}
             className="flex min-h-9 items-center gap-1.5 rounded-[6px] border border-emerald-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-700 shadow-sm transition-colors hover:bg-emerald-50"
           >
             {isLoading('export-excel') ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileSpreadsheet className="w-3.5 h-3.5" />}
@@ -496,7 +613,7 @@ export function AdminReports({ requests, residents }: { requests: any[], residen
           </button>
           <button 
             onClick={handleExportPDF}
-            disabled={isLoading('export-pdf')}
+            disabled={isLoading('export-pdf') || !paperUsageIsCurrent || paperUsageLoading || Boolean(paperUsageError && paperUsageIsCurrent)}
             className="flex min-h-9 items-center gap-1.5 rounded-[6px] bg-[#2563EB] px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-[#1D4ED8]"
           >
             {isLoading('export-pdf') ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
@@ -698,69 +815,101 @@ export function AdminReports({ requests, residents }: { requests: any[], residen
         </section>
 
         <section className="report-panel min-w-0 rounded-[10px] border border-[#E2E8F0] bg-white p-3 shadow-sm sm:col-span-2 sm:p-4 xl:col-span-1" aria-labelledby="paper-usage-title">
-          <div className="mb-2 flex items-start justify-between gap-2">
-            <div>
-              <h3 id="paper-usage-title" className="text-sm font-bold text-[#0F172A]">Paper Usage</h3>
-              <p className="text-[11px] text-[#64748B]">By service for the selected period</p>
-            </div>
-            <div className="text-right">
-              <span className="block text-lg font-bold leading-none text-[#0F172A]">{processedData.paperUsage ?? '—'}</span>
-              <span className="text-[9px] text-[#64748B]">{processedData.paperUsage === null ? 'not recorded' : 'sheets'}</span>
+          <div className="mb-3">
+            <h3 id="paper-usage-title" className="text-sm font-bold text-[#0F172A]">Paper Usage</h3>
+            <p className="text-[11px] text-[#64748B]">Print events for {selectedMonth === 'All' ? selectedYear : `${selectedMonth} ${selectedYear}`}</p>
+            <p className="mt-1 text-[9px] leading-snug text-[#64748B]">Based on administrator confirmation; printer output cannot be verified by the system.</p>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <div className="rounded-md bg-[#F8FAFC] px-2.5 py-2">
+                <p className="text-[9px] font-semibold uppercase tracking-wide text-[#64748B]">Total sheets used</p>
+                <p className="mt-0.5 text-lg font-bold tabular-nums text-[#0F172A]">{!paperUsageIsCurrent || paperUsageLoading || paperUsageError ? '—' : paperAnalytics.totalSheets}</p>
+              </div>
+              <div className="rounded-md bg-[#F8FAFC] px-2.5 py-2">
+                <p className="text-[9px] font-semibold uppercase tracking-wide text-[#64748B]">Documents printed</p>
+                <p className="mt-0.5 text-lg font-bold tabular-nums text-[#0F172A]">{!paperUsageIsCurrent || paperUsageLoading || paperUsageError ? '—' : paperAnalytics.totalDocuments}</p>
+              </div>
             </div>
           </div>
-          {processedData.paperUsage !== null && processedData.paperByService.length > 0 ? (
-            <div className="h-[150px] w-full min-w-0">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={processedData.paperByService} layout="vertical" margin={{ top: 0, right: 18, bottom: 0, left: 0 }}>
-                  <CartesianGrid horizontal={false} stroke={isDark ? '#334155' : '#E2E8F0'} />
-                  <XAxis type="number" allowDecimals={false} axisLine={false} tickLine={false} tick={{ fill: isDark ? '#94A3B8' : '#64748B', fontSize: 9 }} />
-                  <YAxis
-                    dataKey="service"
-                    type="category"
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: isDark ? '#CBD5E1' : '#334155', fontSize: 9 }}
-                    tickFormatter={(value: string) => value.length > 14 ? `${value.slice(0, 13)}…` : value}
-                    width={88}
-                  />
-                  <Tooltip
-                    formatter={(value) => [value, 'Sheets used']}
-                    contentStyle={{ borderRadius: '8px', border: `1px solid ${isDark ? '#334155' : '#E2E8F0'}`, backgroundColor: isDark ? '#111827' : '#fff', color: isDark ? '#F8FAFC' : '#0F172A', padding: '7px 10px', fontSize: '11px' }}
-                  />
-                  <Bar dataKey="paper" name="Sheets used" fill="#F59E0B" radius={[0, 4, 4, 0]} maxBarSize={16}>
-                    {processedData.paperByService.map((entry, index) => (
-                      <Cell key={`paper-${entry.service}`} fill={['#F59E0B', '#2563EB', '#10B981', '#6366F1'][index % 4]} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+          {!paperUsageIsCurrent || paperUsageLoading ? (
+            <div className="flex h-[180px] items-center justify-center gap-2 text-[11px] text-[#64748B]">
+              <Loader2 className="h-4 w-4 animate-spin" /> Loading print records…
+            </div>
+          ) : paperUsageError ? (
+            <div role="alert" className="flex min-h-[130px] items-center justify-center text-center text-[11px] text-red-700">{paperUsageError}</div>
+          ) : paperAnalytics.totalDocuments > 0 ? (
+            <div className="space-y-4">
+              <div>
+                <p className="mb-1 text-[10px] font-semibold text-[#475569]">Sheets by service</p>
+                <div className="h-[135px] w-full min-w-0">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={paperAnalytics.byService} layout="vertical" margin={{ top: 0, right: 18, bottom: 0, left: 0 }}>
+                      <CartesianGrid horizontal={false} stroke={isDark ? '#334155' : '#E2E8F0'} />
+                      <XAxis type="number" allowDecimals={false} axisLine={false} tickLine={false} tick={{ fill: isDark ? '#94A3B8' : '#64748B', fontSize: 9 }} />
+                      <YAxis dataKey="service" type="category" axisLine={false} tickLine={false}
+                        tick={{ fill: isDark ? '#CBD5E1' : '#334155', fontSize: 9 }}
+                        tickFormatter={(value: string) => value.length > 14 ? `${value.slice(0, 13)}…` : value} width={88} />
+                      <Tooltip formatter={(value) => [value, 'Sheets used']}
+                        contentStyle={{ borderRadius: '8px', border: `1px solid ${isDark ? '#334155' : '#E2E8F0'}`, backgroundColor: isDark ? '#111827' : '#fff', color: isDark ? '#F8FAFC' : '#0F172A', padding: '7px 10px', fontSize: '11px' }} />
+                      <Bar dataKey="sheets" name="Sheets used" fill="#F59E0B" radius={[0, 4, 4, 0]} maxBarSize={16}>
+                        {paperAnalytics.byService.map((entry, index) => (
+                          <Cell key={`paper-${entry.service}`} fill={['#F59E0B', '#2563EB', '#10B981', '#6366F1'][index % 4]} />
+                        ))}
+                        <LabelList dataKey="sheets" position="right" fill={isDark ? '#CBD5E1' : '#475569'} fontSize={9} />
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+              <div>
+                <p className="mb-1 text-[10px] font-semibold text-[#475569]">Monthly paper consumption</p>
+                <div className="h-[105px] w-full min-w-0">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={filteredPaperMonthlyData} margin={{ top: 8, right: 4, left: -20, bottom: 0 }}>
+                      <CartesianGrid vertical={false} stroke={isDark ? '#334155' : '#E2E8F0'} />
+                      <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: isDark ? '#94A3B8' : '#64748B', fontSize: 8 }} />
+                      <YAxis allowDecimals={false} axisLine={false} tickLine={false} width={28} tick={{ fill: isDark ? '#94A3B8' : '#64748B', fontSize: 8 }} />
+                      <Tooltip formatter={(value) => [value, 'Sheets used']}
+                        contentStyle={{ borderRadius: '8px', border: `1px solid ${isDark ? '#334155' : '#E2E8F0'}`, backgroundColor: isDark ? '#111827' : '#fff', color: isDark ? '#F8FAFC' : '#0F172A', padding: '7px 10px', fontSize: '11px' }} />
+                      <Bar dataKey="sheets" name="Sheets used" fill="#2563EB" radius={[3, 3, 0, 0]} maxBarSize={20} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
             </div>
           ) : (
-            <div className="flex h-[110px] items-center justify-center text-center text-[11px] text-[#64748B]">Paper usage is not recorded for this period.</div>
+            <div className="flex min-h-[150px] items-center justify-center text-center text-[11px] text-[#64748B]">
+              No printing records are available for the selected period.
+            </div>
           )}
         </section>
 
-        <section className="report-panel min-w-0 rounded-[10px] border border-[#E2E8F0] bg-white p-3 shadow-sm sm:p-4" aria-labelledby="appointment-summary-title">
+        <section className="report-panel min-w-0 rounded-[10px] border border-[#E2E8F0] bg-white p-3 shadow-sm sm:col-span-2 sm:p-4 xl:col-span-1" aria-labelledby="processing-performance-title">
           <div className="mb-3">
-            <h3 id="appointment-summary-title" className="text-sm font-bold text-[#0F172A]">Appointment Summary</h3>
+            <h3 id="processing-performance-title" className="text-sm font-bold text-[#0F172A]">Service Processing Performance</h3>
             <p className="text-[11px] text-[#64748B]">{selectedMonth === 'All' ? selectedYear : `${selectedMonth} ${selectedYear}`}</p>
           </div>
-          <dl className="space-y-2">
-            <div className="flex items-center justify-between gap-2 text-[11px]">
-              <dt className="text-[#64748B]">Scheduled appointments</dt>
-              <dd className="font-semibold tabular-nums text-[#0F172A]">{processedData.scheduledAppointments}</dd>
-            </div>
-            <div className="flex items-center justify-between gap-2 text-[11px]">
-              <dt className="text-[#64748B]">Completed appointments</dt>
-              <dd className="font-semibold tabular-nums text-emerald-600">{processedData.completedAppointments}</dd>
-            </div>
-            <div className="flex items-center justify-between gap-2 text-[11px]">
-              <dt className="text-[#64748B]">Cancelled or missed</dt>
-              <dd className="font-semibold tabular-nums text-[#0F172A]">
-                {processedData.cancelledOrMissedAppointments ?? 'Not tracked'}
-              </dd>
-            </div>
-          </dl>
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              { label: 'Total processed', value: processingPerformance.totalProcessed, color: 'text-[#0F172A]' },
+              { label: 'Completion rate', value: `${processingPerformance.completionRate.toFixed(1)}%`, color: 'text-emerald-600' },
+              { label: 'Average processing time', value: formatProcessingDuration(processingPerformance.averageProcessingMs), color: 'text-[#0F172A]' },
+              { label: 'Awaiting review', value: processingPerformance.pending, color: 'text-amber-600' }
+            ].map(item => (
+              <div key={item.label} className="rounded-md border border-[#E2E8F0] bg-[#F8FAFC] px-2.5 py-2">
+                <p className="text-[9px] font-medium text-[#64748B]">{item.label}</p>
+                <p className={`mt-0.5 text-sm font-bold tabular-nums ${item.color}`}>{item.value}</p>
+              </div>
+            ))}
+          </div>
+          <div className="mt-3 border-t border-[#E2E8F0] pt-2">
+            <p className="mb-1.5 text-[10px] font-semibold text-[#475569]">Processing breakdown</p>
+            <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-[10px]">
+              <div className="flex justify-between gap-2"><dt className="text-[#64748B]">Completed</dt><dd className="font-semibold tabular-nums text-emerald-600">{processingPerformance.completed}</dd></div>
+              <div className="flex justify-between gap-2"><dt className="text-[#64748B]">Approved / Processing</dt><dd className="font-semibold tabular-nums text-blue-600">{processingPerformance.approved}</dd></div>
+              <div className="flex justify-between gap-2"><dt className="text-[#64748B]">Pending</dt><dd className="font-semibold tabular-nums text-amber-600">{processingPerformance.pending}</dd></div>
+              <div className="flex justify-between gap-2"><dt className="text-[#64748B]">Disapproved</dt><dd className="font-semibold tabular-nums text-red-600">{processingPerformance.disapproved}</dd></div>
+            </dl>
+          </div>
         </section>
       </div>
 
@@ -778,7 +927,7 @@ export function AdminReports({ requests, residents }: { requests: any[], residen
                   <th className="w-[16%] px-1 py-2 text-right sm:px-3">Requests</th>
                   <th className="w-[16%] px-1 py-2 text-right sm:px-3">Completed</th>
                   <th className="w-[21%] px-1 py-2 text-right sm:px-3"><span className="hidden sm:inline">Not completed</span><span className="sm:hidden">Other</span></th>
-                  <th className="w-[16%] px-1 py-2 text-right sm:px-3">Paper</th>
+                  <th className="w-[16%] px-1 py-2 text-right sm:px-3">Sheets</th>
                   <th className="w-[19%] px-2 py-2 text-right sm:px-3">Complete %</th>
                 </tr>
               </thead>
@@ -789,9 +938,13 @@ export function AdminReports({ requests, residents }: { requests: any[], residen
                     <td className="px-1 py-2 text-right tabular-nums text-[#0F172A] sm:px-3">{data.requests}</td>
                     <td className="px-1 py-2 text-right tabular-nums text-emerald-600 sm:px-3">{data.completed}</td>
                     <td className="px-1 py-2 text-right tabular-nums text-amber-600 sm:px-3">{data.requests - data.completed}</td>
-                    <td className="px-1 py-2 text-right tabular-nums text-[#0F172A] sm:px-3">{data.paper ?? 'Not recorded'}</td>
+                    <td className="px-1 py-2 text-right tabular-nums text-[#0F172A] sm:px-3">
+                      {!paperUsageIsCurrent || paperUsageLoading || paperUsageError ? '—' : paperByMonth.get(data.month)?.sheets || 0}
+                    </td>
                     <td className="px-2 py-2 text-right tabular-nums text-[#0F172A] sm:px-3">
-                      {data.requests > 0 ? Math.round((data.completed / data.requests) * 100) : 0}%
+                      {data.completed + data.disapproved > 0
+                        ? Math.round((data.completed / (data.completed + data.disapproved)) * 100)
+                        : 0}%
                     </td>
                   </tr>
                 ))}
@@ -814,7 +967,7 @@ export function AdminReports({ requests, residents }: { requests: any[], residen
         </header>
         <div className="print-report-meta">
           <span><strong>Reporting period:</strong> {selectedMonth === 'All' ? 'All Months' : months[months.indexOf(selectedMonth)]} {selectedYear}</span>
-          <span><strong>Generated:</strong> {new Date().toLocaleString()}</span>
+          <span><strong>Generated:</strong> {new Date().toLocaleString('en-PH', { timeZone: 'Asia/Manila' })}</span>
         </div>
 
         <section className="print-report-section">
@@ -825,36 +978,42 @@ export function AdminReports({ requests, residents }: { requests: any[], residen
               <tr><th>Completed requests</th><td>{processedData.statusSummary.completed}</td><th>Pending requests</th><td>{processedData.statusSummary.pending}</td></tr>
               <tr><th>Approved requests</th><td>{processedData.statusSummary.approved}</td><th>Disapproved requests</th><td>{processedData.statusSummary.disapproved}</td></tr>
               <tr><th>Most requested service</th><td>{processedData.mostRequestedService?.service || 'No requests'}</td><th>Requests for top service</th><td>{processedData.mostRequestedService?.requests ?? 0}</td></tr>
-              <tr><th>Paper sheets used</th><td>{processedData.paperUsage ?? 'Not recorded'}</td><th>Scheduled appointments</th><td>{processedData.scheduledAppointments}</td></tr>
-              <tr><th>Completed appointments</th><td>{processedData.completedAppointments}</td><th>Cancelled or missed</th><td>{processedData.cancelledOrMissedAppointments ?? 'Not tracked'}</td></tr>
+              <tr><th>Total processed requests</th><td>{processingPerformance.totalProcessed}</td><th>Completion rate</th><td>{processingPerformance.completionRate.toFixed(1)}%</td></tr>
+              <tr><th>Average processing time</th><td>{formatProcessingDuration(processingPerformance.averageProcessingMs)}</td><th>Awaiting review</th><td>{processingPerformance.pending}</td></tr>
+              <tr><th>Documents printed</th><td>{paperAnalytics.totalDocuments}</td><th>Paper sheets used</th><td>{paperAnalytics.totalSheets}</td></tr>
             </tbody>
           </table>
         </section>
 
         <section className="print-report-section">
-          <h2>Monthly Service Requests</h2>
+          <h2>Monthly Service Requests and Paper Usage</h2>
           <table>
             <thead>
-              <tr><th>Month</th><th>Total requests</th><th>Completed</th><th>Pending</th><th>Approved</th><th>Disapproved</th><th>Paper sheets used</th><th>Complete %</th></tr>
+              <tr><th>Month</th><th>Total requests</th><th>Completed</th><th>Pending</th><th>Approved</th><th>Disapproved</th><th>Processed</th><th>Documents printed</th><th>Paper sheets used</th><th>Complete %</th></tr>
             </thead>
             <tbody>
               {filteredMonthlyData.map(data => (
                 <tr key={`print-${data.month}`}>
                   <td>{data.month}</td><td>{data.requests}</td><td>{data.completed}</td>
                   <td>{data.pending}</td><td>{data.approved}</td><td>{data.disapproved}</td>
-                  <td>{data.paper ?? 'Not recorded'}</td>
-                  <td>{data.requests > 0 ? `${Math.round((data.completed / data.requests) * 100)}%` : '0%'}</td>
+                  <td>{data.completed + data.disapproved}</td>
+                  <td>{paperByMonth.get(data.month)?.documents || 0}</td>
+                  <td>{paperByMonth.get(data.month)?.sheets || 0}</td>
+                  <td>{data.completed + data.disapproved > 0
+                    ? `${Math.round((data.completed / (data.completed + data.disapproved)) * 100)}%`
+                    : '0%'}</td>
                 </tr>
               ))}
               {filteredMonthlyData.length > 0 && (
                 <tr>
                   <th>Total</th><td>{monthlyTotals.requests}</td><td>{monthlyTotals.completed}</td>
                   <td>{monthlyTotals.pending}</td><td>{monthlyTotals.approved}</td><td>{monthlyTotals.disapproved}</td>
-                  <td>{monthlyTotals.paper ?? 'Not recorded'}</td>
-                  <td>{monthlyTotals.requests > 0 ? `${Math.round((monthlyTotals.completed / monthlyTotals.requests) * 100)}%` : '0%'}</td>
+                  <td>{processingPerformance.totalProcessed}</td><td>{monthlyTotals.paperDocuments}</td>
+                  <td>{monthlyTotals.paper}</td>
+                  <td>{processingPerformance.completionRate.toFixed(1)}%</td>
                 </tr>
               )}
-              {filteredMonthlyData.length === 0 && <tr><td colSpan={8}>No data available for this period.</td></tr>}
+              {filteredMonthlyData.length === 0 && <tr><td colSpan={10}>No data available for this period.</td></tr>}
             </tbody>
           </table>
         </section>
@@ -876,12 +1035,55 @@ export function AdminReports({ requests, residents }: { requests: any[], residen
         </section>
 
         <section className="print-report-section">
-          <h2>Appointment Summary</h2>
+          <h2>Service Processing Performance</h2>
           <table>
             <tbody>
-              <tr><th>Scheduled appointments</th><td>{processedData.scheduledAppointments}</td></tr>
-              <tr><th>Completed appointments</th><td>{processedData.completedAppointments}</td></tr>
-              <tr><th>Cancelled or missed appointments</th><td>{processedData.cancelledOrMissedAppointments ?? 'Not tracked'}</td></tr>
+              <tr><th>Total processed requests</th><td>{processingPerformance.totalProcessed}</td></tr>
+              <tr><th>Completion rate</th><td>{processingPerformance.completionRate.toFixed(1)}%</td></tr>
+              <tr><th>Average processing time</th><td>{formatProcessingDuration(processingPerformance.averageProcessingMs)}</td></tr>
+              <tr><th>Awaiting review</th><td>{processingPerformance.pending}</td></tr>
+              <tr><th>Completed</th><td>{processingPerformance.completed}</td></tr>
+              <tr><th>Approved / Processing</th><td>{processingPerformance.approved}</td></tr>
+              <tr><th>Pending</th><td>{processingPerformance.pending}</td></tr>
+              <tr><th>Disapproved</th><td>{processingPerformance.disapproved}</td></tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section className="print-report-section">
+          <h2>Paper Usage by Service</h2>
+          <p>These counts reflect administrator-confirmed browser print events; physical printer output is not verified by the system.</p>
+          <table>
+            <thead><tr><th>Service</th><th>Documents printed</th><th>Pages printed</th><th>Sheets used</th></tr></thead>
+            <tbody>
+              {paperAnalytics.byService.map(data => (
+                <tr key={`print-paper-${data.service}`}><td>{data.service}</td><td>{data.documents}</td><td>{data.pages}</td><td>{data.sheets}</td></tr>
+              ))}
+              {paperAnalytics.totalDocuments === 0 && <tr><td colSpan={4}>No printing records are available for this period.</td></tr>}
+              <tr><th>Total</th><td>{paperAnalytics.totalDocuments}</td><td>{paperAnalytics.byService.reduce((total, data) => total + data.pages, 0)}</td><td>{paperAnalytics.totalSheets}</td></tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section className="print-report-section">
+          <h2>Print History</h2>
+          <table>
+            <thead><tr><th>Printed at</th><th>Request ID</th><th>Resident</th><th>Resident ID</th><th>Document</th><th>Pages</th><th>Sheets</th><th>Administrator ID</th><th>Administrator</th></tr></thead>
+            <tbody>
+              {paperRecords.map(record => (
+                <tr key={`print-event-${record.id}`}>
+                  <td>{new Date(record.printedAt).toLocaleString('en-PH', { timeZone: 'Asia/Manila' })}</td>
+                  <td>{record.requestId || 'Request removed'}</td>
+                  <td>{record.residentName}</td>
+                  <td>{record.residentId || 'Unavailable'}</td>
+                  <td>{record.documentType}</td>
+                  <td>{record.pagesPrinted}</td>
+                  <td>{record.sheetsUsed}</td>
+                  <td>{record.adminUserId || 'Unavailable'}</td>
+                  <td>{record.adminName}</td>
+                </tr>
+              ))}
+              {paperRecords.length === 0 && <tr><td colSpan={9}>No printing records are available for this period.</td></tr>}
             </tbody>
           </table>
         </section>

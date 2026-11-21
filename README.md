@@ -47,6 +47,8 @@ The app's five-minute display matches the configured Supabase expiry; the server
 
 Run the applicable SQL migrations in the Supabase SQL Editor before using registration, resident document review, or the related approval workflow. In particular, apply `database_resident_registration.sql`.
 
+After `database_resident_registration.sql` or `database_security_fix.sql` has created `public.is_admin()`, apply `database_paper_usage.sql` to create the administrator-only paper print history used by Admin Reports. Paper usage is recorded only after an administrator confirms a browser print; browser APIs cannot independently verify that a physical printer completed the job.
+
 `database_security_phase2.sql` is a review-only proposal for order, request-state, announcement, profile, and view access controls. It has not been applied. Review and test it in a staging environment after `database_security_hardening.sql`, `database_security_fix.sql`, and `database_resident_registration.sql` are in place; verify actual policies and grants before production rollout.
 
 ## Local checks
