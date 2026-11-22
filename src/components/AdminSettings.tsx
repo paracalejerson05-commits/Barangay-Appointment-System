@@ -1,6 +1,8 @@
 import { supabase } from '../lib/supabase';
 import React, { useState, useEffect } from 'react';
 import { useTheme } from '../context/ThemeContext';
+import { useLanguage } from '../context/LanguageContext';
+import { LanguagePreference } from './LanguagePreference';
 import { 
   User as UserIcon, 
   Lock, 
@@ -52,6 +54,7 @@ type AdminSettingsSection = 'profile' | 'account' | 'appearance' | 'notification
 
 export function AdminSettings({ user, profile }: AdminSettingsProps) {
   const { theme: themeMode, setTheme } = useTheme();
+  const { t } = useLanguage();
   const sectionFromHash = (): AdminSettingsSection => window.location.hash === '#account' ? 'account' : 'profile';
   const [activeSection, setActiveSection] = useState<AdminSettingsSection>(sectionFromHash);
   const { isLoading, startLoading, stopLoading } = useLoadingActions();
@@ -326,7 +329,7 @@ export function AdminSettings({ user, profile }: AdminSettingsProps) {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h2 className="text-2xl sm:text-[30px] font-bold text-[#0F172A] dark:text-slate-100 tracking-tight">
-            Admin Settings
+            {t('Admin Settings')}
           </h2>
           <p className="text-xs sm:text-sm text-[#64748B] dark:text-slate-400 mt-0.5 font-normal">
             Configure system operations, administrator credentials, announcements, and smart queue controls.
@@ -383,7 +386,7 @@ export function AdminSettings({ user, profile }: AdminSettingsProps) {
           {settingsCategories.map((groupCat) => (
             <div key={groupCat.group} className="bg-white dark:bg-slate-900 rounded-[14px] border border-[#E2E8F0] dark:border-slate-800 p-2 shadow-2xs">
               <h3 className="px-3 py-1.5 text-[11px] font-bold text-[#64748B] dark:text-slate-400 uppercase tracking-wider">
-                {groupCat.group}
+                {t(groupCat.group)}
               </h3>
               <div className="space-y-1 mt-1">
                 {groupCat.items.map((item) => {
@@ -416,10 +419,10 @@ export function AdminSettings({ user, profile }: AdminSettingsProps) {
                             "block text-xs sm:text-[15px] font-semibold truncate",
                             isActive ? "text-[#2563EB] dark:text-blue-400" : "text-[#0F172A] dark:text-slate-200"
                           )}>
-                            {item.label}
+                            {t(item.label)}
                           </span>
                           <span className="block text-[11px] text-[#64748B] dark:text-slate-400 truncate mt-0.5">
-                            {item.desc}
+                            {t(item.desc)}
                           </span>
                         </div>
                       </div>
@@ -631,14 +634,14 @@ export function AdminSettings({ user, profile }: AdminSettingsProps) {
                 className="space-y-5"
               >
                 <div className="border-b border-[#F1F5F9] dark:border-slate-800 pb-3">
-                  <h3 className="text-lg sm:text-[20px] font-bold text-[#0F172A] dark:text-slate-100">Appearance</h3>
-                  <p className="text-xs sm:text-[14px] text-[#64748B] dark:text-slate-400 mt-0.5">Choose your preferred display theme for the administration console.</p>
+                  <h3 className="text-lg sm:text-[20px] font-bold text-[#0F172A] dark:text-slate-100">{t('Appearance')}</h3>
+                  <p className="text-xs sm:text-[14px] text-[#64748B] dark:text-slate-400 mt-0.5">{t('Choose your preferred display theme for the administration console.')}</p>
                 </div>
 
                 <div className="bg-[#F8FAFC] dark:bg-slate-800/60 p-4 rounded-[12px] border border-[#E2E8F0] dark:border-slate-700/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div>
-                    <h4 className="text-sm sm:text-[15px] font-semibold text-[#0F172A] dark:text-slate-100">Theme Mode</h4>
-                    <p className="text-xs text-[#64748B] dark:text-slate-400 mt-0.5">Select Light or Dark mode for dashboard viewing.</p>
+                    <h4 className="text-sm sm:text-[15px] font-semibold text-[#0F172A] dark:text-slate-100">{t('Theme Mode')}</h4>
+                    <p className="text-xs text-[#64748B] dark:text-slate-400 mt-0.5">{t('Select Light or Dark mode for dashboard viewing.')}</p>
                   </div>
 
                   <div className="inline-flex items-center p-1 bg-[#E2E8F0]/80 dark:bg-slate-900 rounded-full border border-[#CBD5E1] dark:border-slate-700">
@@ -651,7 +654,7 @@ export function AdminSettings({ user, profile }: AdminSettingsProps) {
                       )}
                     >
                       <Sun className="w-3.5 h-3.5" />
-                      <span>Light Mode</span>
+                      <span>{t('Light Mode')}</span>
                     </button>
                     <button
                       type="button"
@@ -662,7 +665,7 @@ export function AdminSettings({ user, profile }: AdminSettingsProps) {
                       )}
                     >
                       <Moon className="w-3.5 h-3.5" />
-                      <span>Dark Mode</span>
+                      <span>{t('Dark Mode')}</span>
                     </button>
                   </div>
                 </div>
@@ -673,8 +676,8 @@ export function AdminSettings({ user, profile }: AdminSettingsProps) {
                       <Monitor className="w-4 h-4" />
                     </div>
                     <div>
-                      <h4 className="text-sm sm:text-[15px] font-semibold text-[#0F172A] dark:text-slate-100">System Default</h4>
-                      <p className="text-xs text-[#64748B] dark:text-slate-400">Match operating system preference automatically.</p>
+                      <h4 className="text-sm sm:text-[15px] font-semibold text-[#0F172A] dark:text-slate-100">{t('System Default')}</h4>
+                      <p className="text-xs text-[#64748B] dark:text-slate-400">{t('Match operating system preference automatically.')}</p>
                     </div>
                   </div>
                   <Toggle
@@ -682,6 +685,7 @@ export function AdminSettings({ user, profile }: AdminSettingsProps) {
                     onChange={() => setTheme(themeMode === 'system' ? 'light' : 'system')}
                   />
                 </div>
+                <LanguagePreference />
               </motion.div>
             )}
 

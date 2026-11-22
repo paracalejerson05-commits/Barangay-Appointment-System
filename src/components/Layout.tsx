@@ -37,6 +37,7 @@ import { markNotificationReadInSupabase } from '../lib/supabaseSync';
 import { getNotificationTargetUserIds } from '../lib/notificationScope';
 import { isPrimaryAdmin } from '../lib/adminAccess';
 import { useLoadingActions } from '../hooks/useLoadingActions';
+import { useLanguage } from '../context/LanguageContext';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -57,6 +58,7 @@ export function Layout({ children, user, profile, onLogout }: LayoutProps) {
   const [liveTime, setLiveTime] = useState('');
   const location = useLocation();
   const navigate = useNavigate();
+  const { t, locale } = useLanguage();
   const profileMenuRef = useRef<HTMLDivElement>(null);
 
   const isAdmin = profile?.role === 'admin' && profile?.status !== 'deactivated';
@@ -84,7 +86,7 @@ export function Layout({ children, user, profile, onLogout }: LayoutProps) {
 
   useEffect(() => {
     const updateTime = () => {
-      setLiveTime(new Date().toLocaleTimeString('en-US', {
+      setLiveTime(new Date().toLocaleTimeString(locale, {
         hour: '2-digit',
         minute: '2-digit',
         second: '2-digit',
@@ -94,7 +96,7 @@ export function Layout({ children, user, profile, onLogout }: LayoutProps) {
     updateTime();
     const interval = setInterval(updateTime, 1000);
     return () => clearInterval(interval);
-  }, []);
+  }, [locale]);
 
   useEffect(() => {
     async function fetchNotifs() {
@@ -165,8 +167,8 @@ export function Layout({ children, user, profile, onLogout }: LayoutProps) {
   };
 
   const hour = new Date().getHours();
-  const greeting = hour < 12 ? 'Good Morning' : hour < 18 ? 'Good Afternoon' : 'Good Evening';
-  const currentDate = new Date().toLocaleDateString('en-US', { 
+  const greeting = t(hour < 12 ? 'Good Morning' : hour < 18 ? 'Good Afternoon' : 'Good Evening');
+  const currentDate = new Date().toLocaleDateString(locale, {
     weekday: 'short',
     month: 'short', 
     day: 'numeric', 
@@ -305,8 +307,8 @@ export function Layout({ children, user, profile, onLogout }: LayoutProps) {
                   key={item.path}
                   to={item.path}
                   end={item.path === '/'}
-                  title={isDesktopCollapsed ? item.label : undefined}
-                  aria-label={isDesktopCollapsed ? item.label : undefined}
+                  title={isDesktopCollapsed ? t(item.label) : undefined}
+                  aria-label={isDesktopCollapsed ? t(item.label) : undefined}
                   className={({ isActive }) => cn(
                     "group relative flex min-h-11 items-center rounded-[13px] px-3 text-[13px] font-semibold transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB] focus-visible:ring-offset-2",
                     isDesktopCollapsed ? "justify-center" : "gap-3",
@@ -328,7 +330,7 @@ export function Layout({ children, user, profile, onLogout }: LayoutProps) {
                         strokeWidth={1.9}
                         aria-hidden="true"
                       />
-                      {!isDesktopCollapsed && <span className="truncate">{item.label}</span>}
+                      {!isDesktopCollapsed && <span className="truncate">{t(item.label)}</span>}
                     </>
                   )}
                 </NavLink>
@@ -378,15 +380,15 @@ export function Layout({ children, user, profile, onLogout }: LayoutProps) {
             <button
               type="button"
               onClick={onLogout}
-              title={isDesktopCollapsed ? "Sign Out" : undefined}
-              aria-label="Sign Out"
+              title={isDesktopCollapsed ? t('Sign Out') : undefined}
+              aria-label={t('Sign Out')}
               className={cn(
                 "flex min-h-10 w-full items-center rounded-[11px] text-[12px] font-semibold text-[#64748B] transition-colors duration-150 hover:bg-red-50 hover:text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400",
                 isDesktopCollapsed ? "justify-center" : "gap-3 px-3"
               )}
             >
               <LogOut className="h-[17px] w-[17px] flex-shrink-0" strokeWidth={1.9} aria-hidden="true" />
-              {!isDesktopCollapsed && <span>Sign Out</span>}
+              {!isDesktopCollapsed && <span>{t('Sign Out')}</span>}
             </button>
           </div>
         </div>
@@ -437,7 +439,7 @@ export function Layout({ children, user, profile, onLogout }: LayoutProps) {
                         ? "bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800"
                         : "bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800"
                   )}>
-                    {isAdmin ? 'Admin' : isResidentProfileComplete ? 'Profile Complete' : 'Profile Incomplete'}
+                    {isAdmin ? t('Admin') : isResidentProfileComplete ? t('Profile Complete') : t('Profile Incomplete')}
                   </span>
                 </div>
                 <div className="flex items-center gap-1.5 sm:gap-2 text-[11px] text-[#6B7280] dark:text-slate-400">
@@ -459,7 +461,7 @@ export function Layout({ children, user, profile, onLogout }: LayoutProps) {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search services, requests..."
+                  placeholder={t('Search services, requests...')}
                   className="w-full bg-[#F8FAFC] dark:bg-slate-800/80 border border-[#E5E7EB] dark:border-slate-700 rounded-[10px] py-1.5 pl-9 pr-3 text-xs font-normal text-[#111827] dark:text-slate-100 placeholder:text-[#6B7280] dark:placeholder:text-slate-400 focus:bg-white dark:focus:bg-slate-800 focus:border-[#2563EB] transition-all outline-none"
                 />
               </form>
@@ -471,7 +473,7 @@ export function Layout({ children, user, profile, onLogout }: LayoutProps) {
                 <button 
                   onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
                   className="p-2 text-[#6B7280] dark:text-slate-300 hover:bg-[#F8FAFC] dark:hover:bg-slate-800 active:bg-[#E5E7EB] rounded-[12px] relative transition-colors cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center"
-                  aria-label="Notifications"
+                  aria-label={t('Notifications')}
                 >
                   <Bell className="w-[18px] h-[18px] text-[#6B7280] dark:text-slate-300" />
                   {unreadCount > 0 && (
@@ -490,7 +492,7 @@ export function Layout({ children, user, profile, onLogout }: LayoutProps) {
                       <div className="p-3.5 border-b border-[#E5E7EB] dark:border-slate-800 flex items-center justify-between bg-[#F8FAFC] dark:bg-slate-800/60">
                         <div className="flex items-center gap-2">
                           <Bell className="w-4 h-4 text-[#2563EB] dark:text-blue-400" />
-                          <h4 className="font-bold text-xs text-[#111827] dark:text-slate-100 uppercase tracking-wider">Notifications</h4>
+                          <h4 className="font-bold text-xs text-[#111827] dark:text-slate-100 uppercase tracking-wider">{t('Notifications')}</h4>
                         </div>
                         <button 
                           onClick={handleMarkAllAsRead}
@@ -498,13 +500,13 @@ export function Layout({ children, user, profile, onLogout }: LayoutProps) {
                           className="inline-flex items-center gap-1 text-xs font-semibold text-[#2563EB] dark:text-blue-400 hover:underline cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                         >
                           {isLoading('mark-all-notifications-read') && <Loader2 className="h-3 w-3 animate-spin" />}
-                          {isLoading('mark-all-notifications-read') ? 'Marking…' : 'Mark all as read'}
+                          {isLoading('mark-all-notifications-read') ? t('Marking…') : t('Mark all as read')}
                         </button>
                       </div>
                       <div className="max-h-80 overflow-y-auto divide-y divide-[#E5E7EB] dark:divide-slate-800">
                         {notifications.length === 0 ? (
                           <div className="p-6 text-center text-xs text-[#6B7280] dark:text-slate-400">
-                            No notifications at this time.
+                            {t('No notifications at this time.')}
                           </div>
                         ) : (
                           notifications.map((n) => (
@@ -527,14 +529,14 @@ export function Layout({ children, user, profile, onLogout }: LayoutProps) {
                                 </div>
                                 <div className="flex-1">
                                   <div className="flex items-center justify-between mb-0.5">
-                                    <p className="text-xs font-semibold text-[#111827] dark:text-slate-100">{n.title}</p>
+                                    <p className="text-xs font-semibold text-[#111827] dark:text-slate-100">{t(n.title)}</p>
                                     {!n.read && (
                                       isLoading(`mark-notification-read:${n.id}`)
                                         ? <Loader2 className="h-3 w-3 animate-spin text-[#2563EB]" />
                                         : <span className="w-2 h-2 rounded-full bg-[#2563EB]" />
                                     )}
                                   </div>
-                                  <p className="text-[11px] text-[#6B7280] dark:text-slate-400 mb-1 leading-snug">{n.message}</p>
+                                  <p className="text-[11px] text-[#6B7280] dark:text-slate-400 mb-1 leading-snug">{t(n.message)}</p>
                                   <p className="text-[9px] text-[#6B7280] dark:text-slate-500 font-semibold uppercase">{n.time}</p>
                                 </div>
                               </div>
@@ -553,8 +555,8 @@ export function Layout({ children, user, profile, onLogout }: LayoutProps) {
                   type="button"
                   onClick={() => setIsProfileMenuOpen(open => !open)}
                   className="flex min-h-[44px] min-w-[44px] items-center justify-center gap-1 rounded-xl transition-colors hover:bg-slate-50 active:scale-95 dark:hover:bg-slate-800"
-                  title="Profile menu"
-                  aria-label="Open profile menu"
+                  title={t('Profile menu')}
+                  aria-label={t('Open profile menu')}
                   aria-haspopup="menu"
                   aria-expanded={isProfileMenuOpen}
                 >
@@ -574,7 +576,7 @@ export function Layout({ children, user, profile, onLogout }: LayoutProps) {
                       exit={{ opacity: 0, y: 6, scale: 0.98 }}
                       transition={{ duration: 0.14 }}
                       role="menu"
-                      aria-label="Profile options"
+                      aria-label={t('Profile menu')}
                       className="absolute right-0 top-full z-[60] mt-2 w-56 max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl dark:border-slate-700 dark:bg-slate-900"
                     >
                       <div className="border-b border-slate-100 px-3 py-2.5 dark:border-slate-800">
@@ -583,22 +585,22 @@ export function Layout({ children, user, profile, onLogout }: LayoutProps) {
                       </div>
                       <Link to="/settings#profile" role="menuitem" onClick={() => setIsProfileMenuOpen(false)} className="flex min-h-10 items-center gap-2.5 rounded-lg px-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800">
                         <UserRound className="h-4 w-4 text-slate-500 dark:text-slate-400" />
-                        My Profile
+                        {t('My Profile')}
                       </Link>
                       {canManageAdmins && (
                         <Link to="/admins" role="menuitem" onClick={() => setIsProfileMenuOpen(false)} className="flex min-h-10 items-center gap-2.5 rounded-lg px-3 text-sm font-semibold text-[#15418C] transition hover:bg-blue-50 dark:text-blue-300 dark:hover:bg-blue-950/50">
                           <ShieldCheck className="h-4 w-4" />
-                          Manage Admins
+                          {t('Manage Admins')}
                         </Link>
                       )}
                       <Link to="/settings#account" role="menuitem" onClick={() => setIsProfileMenuOpen(false)} className="flex min-h-10 items-center gap-2.5 rounded-lg px-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800">
                         <Settings className="h-4 w-4 text-slate-500 dark:text-slate-400" />
-                        Account Settings
+                        {t('Account Settings')}
                       </Link>
                       <div className="my-1 border-t border-slate-100 dark:border-slate-800" />
                       <button type="button" role="menuitem" onClick={() => { setIsProfileMenuOpen(false); onLogout(); }} className="flex min-h-10 w-full items-center gap-2.5 rounded-lg px-3 text-left text-sm font-semibold text-red-600 transition hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/30">
                         <LogOut className="h-4 w-4" />
-                        Sign Out
+                        {t('Sign Out')}
                       </button>
                     </motion.div>
                   )}
@@ -629,10 +631,10 @@ export function Layout({ children, user, profile, onLogout }: LayoutProps) {
                         : "text-[#64748B] hover:bg-[#F8FAFC] dark:text-slate-400 dark:hover:bg-slate-800"
                     );
                   }}
-                  aria-label={item.label}
+                  aria-label={t(item.label)}
                 >
                   <item.icon className="h-5 w-5 flex-shrink-0" strokeWidth={2} />
-                  <span>{item.label}</span>
+                  <span>{t(item.label)}</span>
                 </NavLink>
               ))}
               <button
@@ -647,11 +649,11 @@ export function Layout({ children, user, profile, onLogout }: LayoutProps) {
                       )
                     : "text-[#64748B] hover:bg-[#F8FAFC] dark:text-slate-400 dark:hover:bg-slate-800"
                 )}
-                aria-label="More navigation options"
+                aria-label={t('More navigation options')}
                 aria-expanded={isMoreMenuOpen}
               >
                 <Menu className="h-5 w-5 flex-shrink-0" strokeWidth={2} />
-                <span>More</span>
+                <span>{t('More')}</span>
               </button>
             </div>
           </nav>
@@ -687,11 +689,11 @@ export function Layout({ children, user, profile, onLogout }: LayoutProps) {
             >
               <div className="w-10 h-1 rounded-full bg-slate-300 dark:bg-slate-600 mx-auto mt-3 mb-1" />
               <div className="flex items-center justify-between px-5 py-3 border-b border-[#E5E7EB] dark:border-slate-800">
-                <h3 id="mobile-more-title" className="font-bold text-base text-[#111827] dark:text-white">More</h3>
+                <h3 id="mobile-more-title" className="font-bold text-base text-[#111827] dark:text-white">{t('More')}</h3>
                 <button 
                   onClick={() => setIsMoreMenuOpen(false)}
                   className="min-h-[44px] min-w-[44px] -mr-2 flex items-center justify-center bg-[#F3F4F6] dark:bg-slate-800 text-[#6B7280] dark:text-slate-300 rounded-full transition-colors hover:bg-slate-200 dark:hover:bg-slate-700"
-                  aria-label="Close More menu"
+                  aria-label={t('Close More menu')}
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -703,7 +705,7 @@ export function Layout({ children, user, profile, onLogout }: LayoutProps) {
                   className="flex min-h-[56px] items-center gap-3 px-3 rounded-[14px] hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
                 >
                   <Settings className="w-5 h-5 text-slate-600 dark:text-slate-300" />
-                  <span className="flex-1 font-semibold text-sm text-[#111827] dark:text-slate-100">Settings</span>
+                  <span className="flex-1 font-semibold text-sm text-[#111827] dark:text-slate-100">{t('Settings')}</span>
                   <ChevronRight className="w-4 h-4 text-slate-400" />
                 </Link>
                 <button
@@ -712,7 +714,7 @@ export function Layout({ children, user, profile, onLogout }: LayoutProps) {
                   className="w-full flex min-h-[56px] items-center gap-3 px-3 rounded-[14px] hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors text-left"
                 >
                   <Bell className="w-5 h-5 text-slate-600 dark:text-slate-300" />
-                  <span className="flex-1 font-semibold text-sm text-[#111827] dark:text-slate-100">Notifications</span>
+                  <span className="flex-1 font-semibold text-sm text-[#111827] dark:text-slate-100">{t('Notifications')}</span>
                   <ChevronRight className="w-4 h-4 text-slate-400" />
                 </button>
                 <button
@@ -721,7 +723,7 @@ export function Layout({ children, user, profile, onLogout }: LayoutProps) {
                   className="w-full flex min-h-[56px] items-center gap-3 px-3 rounded-[14px] hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors text-left"
                 >
                   <LogOut className="w-5 h-5 text-red-600 dark:text-red-400" />
-                  <span className="flex-1 font-semibold text-sm text-red-600 dark:text-red-400">Sign Out</span>
+                  <span className="flex-1 font-semibold text-sm text-red-600 dark:text-red-400">{t('Sign Out')}</span>
                   <ChevronRight className="w-4 h-4 text-red-400" />
                 </button>
               </div>

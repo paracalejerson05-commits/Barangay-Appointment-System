@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useTheme } from '../context/ThemeContext';
+import { useLanguage } from '../context/LanguageContext';
 import { AdminSettings } from './AdminSettings';
+import { LanguagePreference } from './LanguagePreference';
 import { 
   User as UserIcon, 
   Lock, 
@@ -51,6 +53,7 @@ const getAgeError = (value: number | null) => (value !== null && value >= 1 && v
 
 export function Settings({ user, profile }: SettingsProps) {
   const { theme: themeMode, setTheme } = useTheme();
+  const { t } = useLanguage();
   const isAdmin = profile?.role === 'admin' || user?.email === 'paracalejerson05@gmail.com';
 
   if (isAdmin) {
@@ -565,7 +568,7 @@ export function Settings({ user, profile }: SettingsProps) {
           {settingsCategories.map((groupCat) => (
             <div key={groupCat.group} className="bg-white dark:bg-slate-900 rounded-[14px] border border-[#E2E8F0] dark:border-slate-800 p-1.5 sm:p-2 shadow-2xs transition-colors duration-200">
               <h3 className="px-3 py-1.5 text-[11px] font-bold text-[#64748B] dark:text-slate-400 uppercase tracking-wider">
-                {groupCat.group}
+                {t(groupCat.group)}
               </h3>
               <div className="space-y-1 mt-1">
                 {groupCat.items.map((item) => {
@@ -598,10 +601,10 @@ export function Settings({ user, profile }: SettingsProps) {
                             "block text-xs sm:text-[15px] font-semibold truncate",
                             isActive ? "text-[#2563EB] dark:text-blue-400" : "text-[#0F172A] dark:text-slate-200"
                           )}>
-                            {item.label}
+                            {t(item.label)}
                           </span>
                           <span className="block text-[11px] text-[#64748B] dark:text-slate-400 truncate mt-0.5">
-                            {item.desc}
+                            {t(item.desc)}
                           </span>
                         </div>
                       </div>
@@ -617,7 +620,7 @@ export function Settings({ user, profile }: SettingsProps) {
           ))}
         </div>
 
-        {/* Right: Settings Content Card */}
+        {/* Right:         {t('Settings')} Content Card */}
         <div className="lg:col-span-8 bg-white dark:bg-slate-900 rounded-[14px] border border-[#E2E8F0] dark:border-slate-800 p-4 sm:p-6 shadow-2xs transition-colors duration-200">
           <AnimatePresence mode="wait">
             {/* =========================================================
@@ -1013,10 +1016,10 @@ export function Settings({ user, profile }: SettingsProps) {
                 <div className="border-b border-[#F1F5F9] dark:border-slate-800 pb-3">
                   <h3 className="text-lg sm:text-xl font-bold text-[#0F172A] dark:text-slate-100 flex items-center gap-2">
                     <Palette className="w-5 h-5 text-[#2563EB] dark:text-blue-400" />
-                    Appearance
+                    {t('Appearance')}
                   </h3>
                   <p className="text-xs sm:text-sm text-[#64748B] dark:text-slate-400 mt-0.5">
-                    Customize the visual display theme for your mobile device interface.
+                    {t('Customize the visual display theme for your mobile device interface.')}
                   </p>
                 </div>
 
@@ -1024,10 +1027,10 @@ export function Settings({ user, profile }: SettingsProps) {
                 <div className="bg-[#F8FAFC] dark:bg-slate-800/60 p-4 rounded-[12px] border border-[#E2E8F0] dark:border-slate-700/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
                   <div>
                     <h4 className="text-sm sm:text-[15px] font-semibold text-[#0F172A] dark:text-slate-100">
-                      Theme Preference
+                      {t('Theme Preference')}
                     </h4>
                     <p className="text-xs text-[#64748B] dark:text-slate-400 mt-0.5">
-                      Switch between clean Light Mode and night-friendly Dark Mode.
+                      {t('Switch between clean Light Mode and night-friendly Dark Mode.')}
                     </p>
                   </div>
 
@@ -1043,7 +1046,7 @@ export function Settings({ user, profile }: SettingsProps) {
                       )}
                     >
                       <span>☀️</span>
-                      <span>Light Mode</span>
+                      <span>{t('Light Mode')}</span>
                     </button>
 
                     <button
@@ -1057,7 +1060,7 @@ export function Settings({ user, profile }: SettingsProps) {
                       )}
                     >
                       <span>🌙</span>
-                      <span>Dark Mode</span>
+                      <span>{t('Dark Mode')}</span>
                     </button>
                   </div>
                 </div>
@@ -1070,10 +1073,10 @@ export function Settings({ user, profile }: SettingsProps) {
                     </div>
                     <div>
                       <h4 className="text-sm sm:text-[15px] font-semibold text-[#0F172A] dark:text-slate-100">
-                        System Default
+                        {t('System Default')}
                       </h4>
                       <p className="text-xs text-[#64748B] dark:text-slate-400 mt-0.5">
-                        Automatically synchronize theme with your device settings.
+                        {t('Automatically synchronize theme with your device settings.')}
                       </p>
                     </div>
                   </div>
@@ -1083,6 +1086,7 @@ export function Settings({ user, profile }: SettingsProps) {
                     onChange={() => setTheme(themeMode === 'system' ? 'light' : 'system')}
                   />
                 </div>
+                <LanguagePreference />
               </motion.div>
             )}
 

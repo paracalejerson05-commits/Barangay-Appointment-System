@@ -54,6 +54,7 @@ import { AdminReports } from './AdminReports';
 import { AdminResidents } from './AdminResidents';
 import CertificateEditor from './CertificateEditor';
 import { getServiceRequestTrend, type ServiceRequestTrendPeriod } from '../lib/serviceRequestTrend';
+import { useLanguage } from '../context/LanguageContext';
 
 interface AdminDashboardProps {
   user: any;
@@ -61,6 +62,7 @@ interface AdminDashboardProps {
 }
 
 export function AdminDashboard({ user, profile }: AdminDashboardProps) {
+  const { t, locale } = useLanguage();
   const location = useLocation();
   const [requests, setRequests] = useState<any[]>([]);
   const [residents, setResidents] = useState<any[]>([]);
@@ -145,10 +147,10 @@ export function AdminDashboard({ user, profile }: AdminDashboardProps) {
   const completedToday = todaysAppointments.filter(r => r.status === 'completed');
 
   const stats = [
-    { label: 'Pending Requests', value: requests.filter(r => r?.status === 'pending').length, icon: Clock, color: 'amber' },
-    { label: "Today's Appointments", value: todaysAppointments.length, icon: Calendar, color: 'blue' },
-    { label: 'Completed Today', value: completedToday.length, icon: CheckCircle2, color: 'emerald' },
-    { label: 'Total Residents', value: residents.length, icon: Users, color: 'slate' },
+    { label: t('Pending Requests'), value: requests.filter(r => r?.status === 'pending').length, icon: Clock, color: 'amber' },
+    { label: t("Today's Appointments"), value: todaysAppointments.length, icon: Calendar, color: 'blue' },
+    { label: t('Completed Today'), value: completedToday.length, icon: CheckCircle2, color: 'emerald' },
+    { label: t('Total Residents'), value: residents.length, icon: Users, color: 'slate' },
   ];
 
   const serviceRequestTrend = useMemo(
@@ -157,10 +159,10 @@ export function AdminDashboard({ user, profile }: AdminDashboardProps) {
   );
 
   const pieData = [
-    { name: 'Pending', value: requests.filter(r => r?.status === 'pending').length, color: '#f59e0b' },
-    { name: 'Approved', value: requests.filter(r => r?.status === 'approved').length, color: '#2563eb' },
-    { name: 'Completed', value: requests.filter(r => r?.status === 'completed').length, color: '#10b981' },
-    { name: 'Disapproved', value: requests.filter(r => r?.status === 'disapproved').length, color: '#ef4444' },
+    { name: t('Pending'), value: requests.filter(r => r?.status === 'pending').length, color: '#f59e0b' },
+    { name: t('Approved'), value: requests.filter(r => r?.status === 'approved').length, color: '#2563eb' },
+    { name: t('Completed'), value: requests.filter(r => r?.status === 'completed').length, color: '#10b981' },
+    { name: t('Disapproved'), value: requests.filter(r => r?.status === 'disapproved').length, color: '#ef4444' },
   ];
 
   const servicesCount = requests.reduce((acc, req) => {
@@ -218,15 +220,15 @@ export function AdminDashboard({ user, profile }: AdminDashboardProps) {
               "font-bold text-[#0F172A] tracking-tight",
               isOverviewPage ? "text-[24px] sm:text-[28px]" : isSchedulePage ? "text-[25px] sm:text-[28px]" : "text-[22px] sm:text-[28px]"
             )}>
-              {isOverviewPage ? 'Admin Dashboard' : 
+              {t(isOverviewPage ? 'Admin Dashboard' :
                isRequestsPage ? 'Service Requests' : 
                isResidentsPage ? 'Residents' : 
                isSchedulePage ? 'Schedule & Announcements' :
-               ''}
+               '')}
             </h1>
             {isOverviewPage && (
               <p className="text-[14px] font-normal leading-[1.5] text-[#64748B] mt-0 sm:mt-1 max-w-2xl">
-                Monitor service requests, residents, appointments, and barangay operations.
+                {t('Monitor service requests, residents, appointments, and barangay operations.')}
               </p>
             )}
           </div>
@@ -236,7 +238,7 @@ export function AdminDashboard({ user, profile }: AdminDashboardProps) {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#64748B]" />
               <input
                 type="text"
-                placeholder="Search resident or service..."
+                placeholder={t('Search resident or service...')}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full h-11 bg-white border border-[#E2E8F0] rounded-[8px] py-2 pl-9 pr-3 text-[14px] focus:border-[#2563EB] focus:ring-1 focus:ring-[#2563EB] outline-none transition-all shadow-sm"
@@ -288,11 +290,11 @@ export function AdminDashboard({ user, profile }: AdminDashboardProps) {
                       <Sparkles className="w-4 h-4 text-[#2563EB] dark:text-blue-400" />
                     </div>
                     <div>
-                      <h3 className="text-[14px] sm:text-[16px] font-bold text-[#0F172A] dark:text-slate-100">AI Insights</h3>
-                      <p className="text-[11px] leading-tight text-[#64748B] dark:text-slate-400">Decision support from current dashboard data</p>
+                      <h3 className="text-[14px] sm:text-[16px] font-bold text-[#0F172A] dark:text-slate-100">{t('AI Insights')}</h3>
+                      <p className="text-[11px] leading-tight text-[#64748B] dark:text-slate-400">{t('Decision support from current dashboard data')}</p>
                     </div>
                   </div>
-                  <span className="flex-shrink-0 rounded-full border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-1 text-[10px] font-semibold text-emerald-700 dark:text-emerald-400">Assistive only</span>
+                  <span className="flex-shrink-0 rounded-full border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-1 text-[10px] font-semibold text-emerald-700 dark:text-emerald-400">{t('Assistive only')}</span>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                   {aiInsights.map((insight, index) => (
@@ -310,7 +312,7 @@ export function AdminDashboard({ user, profile }: AdminDashboardProps) {
               <div className="lg:col-span-2 bg-white rounded-[12px] border border-[#E2E8F0] border-t-[3px] border-t-[#1E3A8A] shadow-xs p-3.5 sm:p-5 flex flex-col h-[220px] sm:h-[280px] lg:h-[320px]">
                 <div className="flex items-center justify-between mb-4 flex-shrink-0">
                   <div>
-                    <h3 className="text-[14px] sm:text-[16px] font-bold text-[#0F172A] tracking-tight">Service Request Trend</h3>
+                    <h3 className="text-[14px] sm:text-[16px] font-bold text-[#0F172A] tracking-tight">{t('Service Request Trend')}</h3>
                     <p className="text-[11px] sm:text-[12px] text-[#64748B]">{serviceRequestTrend.description}</p>
                   </div>
                   <div className="flex items-center gap-1 bg-[#F8FAFC] border border-[#E2E8F0] rounded-[6px] p-0.5">
@@ -323,7 +325,7 @@ export function AdminDashboard({ user, profile }: AdminDashboardProps) {
                         trendPeriod === 'week' ? 'bg-white shadow-xs text-[#0F172A]' : 'text-[#64748B] hover:text-[#0F172A]'
                       )}
                     >
-                      This Week
+                      {t('This Week')}
                     </button>
                     <button
                       type="button"
@@ -334,7 +336,7 @@ export function AdminDashboard({ user, profile }: AdminDashboardProps) {
                         trendPeriod === 'month' ? 'bg-white shadow-xs text-[#0F172A]' : 'text-[#64748B] hover:text-[#0F172A]'
                       )}
                     >
-                      This Month
+                      {t('This Month')}
                     </button>
                   </div>
                 </div>
@@ -348,11 +350,11 @@ export function AdminDashboard({ user, profile }: AdminDashboardProps) {
                         contentStyle={{ borderRadius: '8px', border: '1px solid #E2E8F0', fontSize: '12px', boxShadow: '0 1px 2px 0 rgb(0 0 0 / 0.05)' }}
                       />
                       <Legend iconType="circle" wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }} />
-                      <Line type="monotone" dataKey="Total" stroke="#94A3B8" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
-                      <Line type="monotone" dataKey="Completed" stroke="#10b981" strokeWidth={2} dot={{ r: 3 }} />
-                      <Line type="monotone" dataKey="Pending" stroke="#f59e0b" strokeWidth={2} dot={{ r: 3 }} />
-                      <Line type="monotone" dataKey="Approved" stroke="#2563eb" strokeWidth={2} dot={{ r: 3 }} />
-                      <Line type="monotone" dataKey="Disapproved" stroke="#ef4444" strokeWidth={2} dot={{ r: 3 }} />
+                      <Line type="monotone" dataKey="Total" name={t('Total')} stroke="#94A3B8" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
+                      <Line type="monotone" dataKey="Completed" name={t('Completed')} stroke="#10b981" strokeWidth={2} dot={{ r: 3 }} />
+                      <Line type="monotone" dataKey="Pending" name={t('Pending')} stroke="#f59e0b" strokeWidth={2} dot={{ r: 3 }} />
+                      <Line type="monotone" dataKey="Approved" name={t('Approved')} stroke="#2563eb" strokeWidth={2} dot={{ r: 3 }} />
+                      <Line type="monotone" dataKey="Disapproved" name={t('Disapproved')} stroke="#ef4444" strokeWidth={2} dot={{ r: 3 }} />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
@@ -361,8 +363,8 @@ export function AdminDashboard({ user, profile }: AdminDashboardProps) {
               {/* Request Status Donut Chart */}
               <div className="bg-white rounded-[12px] border border-[#E2E8F0] border-t-[3px] border-t-[#2563EB] shadow-xs p-3.5 sm:p-5 flex flex-col h-[220px] sm:h-[280px] lg:h-[320px]">
                 <div className="mb-2 flex-shrink-0 text-center sm:text-left">
-                  <h3 className="text-[14px] sm:text-[16px] font-bold text-[#0F172A] tracking-tight">Request Status</h3>
-                  <p className="text-[11px] sm:text-[12px] text-[#64748B]">All-time distribution</p>
+                  <h3 className="text-[14px] sm:text-[16px] font-bold text-[#0F172A] tracking-tight">{t('Request Status')}</h3>
+                  <p className="text-[11px] sm:text-[12px] text-[#64748B]">{t('All-time distribution')}</p>
                 </div>
                 <div className="flex-1 relative min-h-0">
                   <ResponsiveContainer width="100%" height="100%">
@@ -385,7 +387,7 @@ export function AdminDashboard({ user, profile }: AdminDashboardProps) {
                   </ResponsiveContainer>
                   <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                     <span className="text-[22px] sm:text-[24px] font-bold text-[#0F172A]">{requests.length}</span>
-                    <span className="text-[11px] text-[#64748B]">Total</span>
+                    <span className="text-[11px] text-[#64748B]">{t('Total')}</span>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-2 mt-2 flex-shrink-0">
@@ -405,8 +407,8 @@ export function AdminDashboard({ user, profile }: AdminDashboardProps) {
               {/* Most Requested Services */}
               <div className="bg-white rounded-[12px] border border-[#E2E8F0] border-t-[3px] border-t-[#1E3A8A] shadow-xs p-3.5 sm:p-5 flex flex-col h-[210px] sm:h-[280px]">
                 <div className="mb-4 flex-shrink-0">
-                  <h3 className="text-[14px] sm:text-[16px] font-bold text-[#0F172A] tracking-tight">Most Requested Services</h3>
-                  <p className="text-[11px] sm:text-[12px] text-[#64748B]">Top 5 services requested</p>
+                  <h3 className="text-[14px] sm:text-[16px] font-bold text-[#0F172A] tracking-tight">{t('Most Requested Services')}</h3>
+                  <p className="text-[11px] sm:text-[12px] text-[#64748B]">{t('Top 5 services requested')}</p>
                 </div>
                 <div className="flex-1 min-h-0">
                   {topServices.length > 0 ? (
@@ -420,7 +422,7 @@ export function AdminDashboard({ user, profile }: AdminDashboardProps) {
                       </BarChart>
                     </ResponsiveContainer>
                   ) : (
-                    <div className="h-full flex items-center justify-center text-[12px] text-[#64748B]">No data available yet.</div>
+                    <div className="h-full flex items-center justify-center text-[12px] text-[#64748B]">{t('No data available yet.')}</div>
                   )}
                 </div>
               </div>
@@ -429,30 +431,30 @@ export function AdminDashboard({ user, profile }: AdminDashboardProps) {
               <div className="bg-white rounded-[12px] border border-[#E2E8F0] border-t-[3px] border-t-sky-600 shadow-xs p-3.5 sm:p-5 flex flex-col h-auto sm:h-[280px]">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 flex-shrink-0">
                   <div>
-                    <h3 className="text-[14px] sm:text-[16px] font-bold text-[#0F172A] tracking-tight">Today's Appointment & Queue</h3>
-                    <p className="text-[11px] sm:text-[12px] text-[#64748B]">{format(new Date(), 'EEEE, MMMM d, yyyy')}</p>
+                    <h3 className="text-[14px] sm:text-[16px] font-bold text-[#0F172A] tracking-tight">{t("Today's Appointment & Queue")}</h3>
+                    <p className="text-[11px] sm:text-[12px] text-[#64748B]">{new Date().toLocaleDateString(locale, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</p>
                   </div>
                   <div className="flex items-center gap-1.5 text-[11px] sm:text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 sm:py-0.5 rounded-full border border-emerald-200 self-start sm:self-auto">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                    <span className="tracking-wide uppercase">Live</span>
+                    <span className="tracking-wide uppercase">{t('Live')}</span>
                   </div>
                 </div>
                 
                 <div className="grid grid-cols-1 min-[420px]:grid-cols-2 gap-2 sm:gap-3 flex-1 mb-4">
                   <div className="p-3 bg-[#F8FAFC] border border-[#E2E8F0] rounded-[8px] flex flex-col justify-center">
-                    <p className="text-[11px] sm:text-[12px] font-semibold text-[#64748B] leading-tight">Today's Appointments</p>
+                    <p className="text-[11px] sm:text-[12px] font-semibold text-[#64748B] leading-tight">{t("Today's Appointments")}</p>
                     <p className="text-[22px] sm:text-[24px] font-bold text-[#0F172A] mt-1">{todaysAppointments.length}</p>
                   </div>
                   <div className="p-3 bg-[#F8FAFC] border border-[#E2E8F0] rounded-[8px] flex flex-col justify-center">
-                    <p className="text-[11px] sm:text-[12px] font-semibold text-[#64748B] leading-tight">Upcoming Appointments</p>
+                    <p className="text-[11px] sm:text-[12px] font-semibold text-[#64748B] leading-tight">{t('Upcoming Appointments')}</p>
                     <p className="text-[22px] sm:text-[24px] font-bold text-[#0F172A] mt-1">{upcomingAppointments.length}</p>
                   </div>
                   <div className="p-3 bg-amber-50 border border-amber-100 rounded-[8px] flex flex-col justify-center">
-                    <p className="text-[11px] sm:text-[12px] font-semibold text-amber-700 leading-tight">Currently Waiting</p>
+                    <p className="text-[11px] sm:text-[12px] font-semibold text-amber-700 leading-tight">{t('Currently Waiting')}</p>
                     <p className="text-[22px] sm:text-[24px] font-bold text-amber-800 mt-1">{currentlyWaiting.length}</p>
                   </div>
                   <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-[8px] flex flex-col justify-center">
-                    <p className="text-[11px] sm:text-[12px] font-semibold text-emerald-700 leading-tight">Completed Today</p>
+                    <p className="text-[11px] sm:text-[12px] font-semibold text-emerald-700 leading-tight">{t('Completed Today')}</p>
                     <p className="text-[22px] sm:text-[24px] font-bold text-emerald-800 mt-1">{completedToday.length}</p>
                   </div>
                 </div>
@@ -461,7 +463,7 @@ export function AdminDashboard({ user, profile }: AdminDashboardProps) {
                   to="/schedule"
                   className="w-full h-11 sm:h-9 bg-[#F8FAFC] hover:bg-[#F1F5F9] border border-[#E2E8F0] text-[#0F172A] font-semibold text-[14px] rounded-[8px] flex items-center justify-center transition-colors shadow-sm mt-auto"
                 >
-                  Manage Schedule
+                  {t('Manage Schedule')}
                 </Link>
               </div>
 
@@ -474,10 +476,10 @@ export function AdminDashboard({ user, profile }: AdminDashboardProps) {
               <div className="lg:col-span-2 bg-white rounded-[12px] border border-[#E2E8F0] border-t-[3px] border-t-[#1E3A8A] shadow-xs flex flex-col overflow-hidden">
                 <div className="p-4 border-b border-[#E2E8F0] bg-[#F8FAFC] flex items-center justify-between flex-shrink-0">
                   <div>
-                    <h3 className="text-[14px] sm:text-[16px] font-bold text-[#0F172A] tracking-tight">Recent Service Requests</h3>
-                    <p className="text-[11px] sm:text-[12px] text-[#64748B]">Latest resident submissions</p>
+                    <h3 className="text-[14px] sm:text-[16px] font-bold text-[#0F172A] tracking-tight">{t('Recent Service Requests')}</h3>
+                    <p className="text-[11px] sm:text-[12px] text-[#64748B]">{t('Latest resident submissions')}</p>
                   </div>
-                  <Link to="/requests" className="text-[13px] font-semibold text-[#2563EB] hover:underline">View All →</Link>
+                  <Link to="/requests" className="text-[13px] font-semibold text-[#2563EB] hover:underline">{t('View All')} →</Link>
                 </div>
                 
                 {/* Desktop Table */}
@@ -485,11 +487,11 @@ export function AdminDashboard({ user, profile }: AdminDashboardProps) {
                   <table className="w-full text-left text-xs min-w-[500px]">
                     <thead>
                       <tr className="border-b border-[#E2E8F0] text-[#64748B] bg-[#F8FAFC]">
-                        <th className="font-semibold p-3 pl-4">Resident</th>
-                        <th className="font-semibold p-3">Service</th>
-                        <th className="font-semibold p-3">Date</th>
-                        <th className="font-semibold p-3 text-center">Status</th>
-                        <th className="font-semibold p-3 pr-4 text-right">Action</th>
+                        <th className="font-semibold p-3 pl-4">{t('Resident')}</th>
+                        <th className="font-semibold p-3">{t('Service')}</th>
+                        <th className="font-semibold p-3">{t('Date')}</th>
+                        <th className="font-semibold p-3 text-center">{t('Status')}</th>
+                        <th className="font-semibold p-3 pr-4 text-right">{t('Action')}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[#F1F5F9]">
@@ -499,7 +501,7 @@ export function AdminDashboard({ user, profile }: AdminDashboardProps) {
                         <tr key={request.id} className="hover:bg-[#F8FAFC] transition-colors">
                           <td className="p-3 pl-4 font-semibold text-[#0F172A]">{request.residentName}</td>
                           <td className="p-3 text-[#64748B]">{request.serviceType}</td>
-                          <td className="p-3 text-[#64748B]">{formatDate(request.createdAt)}</td>
+                          <td className="p-3 text-[#64748B]">{formatDate(request.createdAt, locale)}</td>
                           <td className="p-3 text-center">
                             <span className={cn(
                               "px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider inline-flex items-center gap-1",
@@ -508,7 +510,7 @@ export function AdminDashboard({ user, profile }: AdminDashboardProps) {
                               request.status === 'disapproved' ? "bg-red-50 text-red-600 border border-red-100" :
                               "bg-amber-50 text-amber-700 border border-amber-200"
                             )}>
-                              {request.status}
+                              {t(request.status)}
                             </span>
                           </td>
                           <td className="p-3 pr-4 text-right">
@@ -522,7 +524,7 @@ export function AdminDashboard({ user, profile }: AdminDashboardProps) {
                         </tr>
                       ))}
                       {filteredRequests.length === 0 && !loading && (
-                        <tr><td colSpan={5} className="p-8 text-center text-[12px] text-[#64748B]">No requests found.</td></tr>
+                        <tr><td colSpan={5} className="p-8 text-center text-[12px] text-[#64748B]">{t('No requests found.')}</td></tr>
                       )}
                     </tbody>
                   </table>
@@ -537,7 +539,7 @@ export function AdminDashboard({ user, profile }: AdminDashboardProps) {
                       <div className="flex justify-between items-start gap-2">
                         <div>
                           <h4 className="font-bold text-[14px] text-[#0F172A] leading-tight">{request.residentName}</h4>
-                          <p className="text-[12px] text-[#64748B] mt-0.5">{request.serviceType}</p>
+                          <p className="text-[12px] text-[#64748B] mt-0.5">{t(request.serviceType)}</p>
                         </div>
                         <span className={cn(
                           "px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider inline-flex items-center gap-1",
@@ -546,22 +548,22 @@ export function AdminDashboard({ user, profile }: AdminDashboardProps) {
                           request.status === 'disapproved' ? "bg-red-50 text-red-600 border border-red-100" :
                           "bg-amber-50 text-amber-700 border border-amber-200"
                         )}>
-                          {request.status}
+                          {t(request.status)}
                         </span>
                       </div>
                       <div className="flex items-center justify-between border-t border-[#F1F5F9] pt-3 mt-1">
-                        <span className="text-[11px] text-[#64748B] flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" />{formatDate(request.createdAt)}</span>
+                        <span className="text-[11px] text-[#64748B] flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" />{formatDate(request.createdAt, locale)}</span>
                         <button 
                           onClick={() => setSelectedRequest(request)}
                           className="text-[12px] font-semibold text-[#2563EB] hover:underline"
                         >
-                          View Details
+                          {t('View Details')}
                         </button>
                       </div>
                     </div>
                   ))}
                   {filteredRequests.length === 0 && !loading && (
-                    <div className="text-center py-6 text-[13px] text-[#64748B]">No requests found.</div>
+                    <div className="text-center py-6 text-[13px] text-[#64748B]">{t('No requests found.')}</div>
                   )}
                 </div>
               </div>
@@ -571,14 +573,14 @@ export function AdminDashboard({ user, profile }: AdminDashboardProps) {
                 <div className="p-4 border-b border-[#E2E8F0] bg-[#F8FAFC] flex items-center justify-between flex-shrink-0">
                   <div className="flex items-center gap-2">
                     <Megaphone className="w-4 h-4 text-[#2563EB]" />
-                    <h3 className="text-[14px] sm:text-[16px] font-bold text-[#0F172A] tracking-tight">Latest Announcements</h3>
+                    <h3 className="text-[14px] sm:text-[16px] font-bold text-[#0F172A] tracking-tight">{t('Latest Announcements')}</h3>
                   </div>
                 </div>
                 <div className="p-4 overflow-y-auto flex-1 space-y-3">
                   <AnnouncementList />
                 </div>
                 <div className="p-3 border-t border-[#E2E8F0] text-center bg-[#F8FAFC] flex-shrink-0">
-                  <Link to="/schedule" className="text-[12px] font-semibold text-[#2563EB] hover:underline">Manage Announcements →</Link>
+                  <Link to="/schedule" className="text-[12px] font-semibold text-[#2563EB] hover:underline">{t('Manage Announcements')} →</Link>
                 </div>
               </div>
             </div>
@@ -586,9 +588,9 @@ export function AdminDashboard({ user, profile }: AdminDashboardProps) {
             {/* 5. Quick Actions */}
             <div className="bg-white rounded-[12px] border border-[#E2E8F0] border-t-[3px] border-t-slate-700 shadow-xs p-4 sm:p-5">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-[14px] sm:text-[16px] font-bold text-[#0F172A] tracking-tight">Quick Actions</h3>
+                <h3 className="text-[14px] sm:text-[16px] font-bold text-[#0F172A] tracking-tight">{t('Quick Actions')}</h3>
                 <Link to="/reports" className="text-[12px] sm:text-[13px] font-semibold text-[#2563EB] hover:underline flex items-center gap-1">
-                  View Activity Log <ArrowUpRight className="w-3 h-3" />
+                  {t('View Activity Log')} <ArrowUpRight className="w-3 h-3" />
                 </Link>
               </div>
               <div className="grid grid-cols-1 min-[420px]:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
@@ -596,25 +598,25 @@ export function AdminDashboard({ user, profile }: AdminDashboardProps) {
                   <div className="w-9 h-9 bg-white rounded-[6px] border border-[#E2E8F0] flex items-center justify-center text-[#2563EB] group-hover:border-blue-300">
                     <FileText className="w-4 h-4" />
                   </div>
-                  <span className="text-[13px] sm:text-[14px] font-semibold text-[#0F172A]">Review Requests</span>
+                  <span className="text-[13px] sm:text-[14px] font-semibold text-[#0F172A]">{t('Review Requests')}</span>
                 </Link>
                 <Link to="/residents" className="flex items-center gap-2.5 p-3 min-h-[48px] rounded-[10px] bg-[#F8FAFC] border border-[#E2E8F0] hover:bg-[#EFF6FF] hover:border-blue-200 transition-colors cursor-pointer group">
                   <div className="w-9 h-9 bg-white rounded-[6px] border border-[#E2E8F0] flex items-center justify-center text-[#2563EB] group-hover:border-blue-300">
                     <Users className="w-4 h-4" />
                   </div>
-                  <span className="text-[13px] sm:text-[14px] font-semibold text-[#0F172A]">Manage Residents</span>
+                  <span className="text-[13px] sm:text-[14px] font-semibold text-[#0F172A]">{t('Manage Residents')}</span>
                 </Link>
                 <Link to="/schedule" className="flex items-center gap-2.5 p-3 min-h-[48px] rounded-[10px] bg-[#F8FAFC] border border-[#E2E8F0] hover:bg-[#EFF6FF] hover:border-blue-200 transition-colors cursor-pointer group">
                   <div className="w-9 h-9 bg-white rounded-[6px] border border-[#E2E8F0] flex items-center justify-center text-[#2563EB] group-hover:border-blue-300">
                     <Calendar className="w-4 h-4" />
                   </div>
-                  <span className="text-[13px] sm:text-[14px] font-semibold text-[#0F172A]">View Schedule</span>
+                  <span className="text-[13px] sm:text-[14px] font-semibold text-[#0F172A]">{t('View Schedule')}</span>
                 </Link>
                 <Link to="/reports" className="flex items-center gap-2.5 p-3 min-h-[48px] rounded-[10px] bg-[#F8FAFC] border border-[#E2E8F0] hover:bg-[#EFF6FF] hover:border-blue-200 transition-colors cursor-pointer group">
                   <div className="w-9 h-9 bg-white rounded-[6px] border border-[#E2E8F0] flex items-center justify-center text-[#2563EB] group-hover:border-blue-300">
                     <BarChart3 className="w-4 h-4" />
                   </div>
-                  <span className="text-[13px] sm:text-[14px] font-semibold text-[#0F172A]">View Reports</span>
+                  <span className="text-[13px] sm:text-[14px] font-semibold text-[#0F172A]">{t('View Reports')}</span>
                 </Link>
               </div>
             </div>
@@ -632,23 +634,23 @@ export function AdminDashboard({ user, profile }: AdminDashboardProps) {
               <div className="flex flex-col gap-4">
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-3 flex-shrink-0">
                   <div className="bg-white p-3 rounded-[8px] border border-[#E2E8F0] border-t-[3px] border-t-[#1E3A8A] shadow-xs flex flex-col justify-center">
-                    <p className="text-[10px] font-semibold text-[#64748B] uppercase tracking-wider mb-0.5">Total Requests</p>
+                    <p className="text-[10px] font-semibold text-[#64748B] uppercase tracking-wider mb-0.5">{t('Total Requests')}</p>
                     <p className="text-xl font-bold text-[#0F172A] leading-none">{requests.length}</p>
                   </div>
                   <div className="bg-white p-3 rounded-[8px] border border-[#E2E8F0] border-t-[3px] border-t-amber-500 shadow-xs flex flex-col justify-center">
-                    <p className="text-[10px] font-semibold text-[#64748B] uppercase tracking-wider mb-0.5">Pending</p>
+                    <p className="text-[10px] font-semibold text-[#64748B] uppercase tracking-wider mb-0.5">{t('Pending')}</p>
                     <p className="text-xl font-bold text-[#0F172A] leading-none">{requests.filter(r => r.status === 'pending').length}</p>
                   </div>
                   <div className="bg-white p-3 rounded-[8px] border border-[#E2E8F0] border-t-[3px] border-t-[#2563EB] shadow-xs flex flex-col justify-center">
-                    <p className="text-[10px] font-semibold text-[#64748B] uppercase tracking-wider mb-0.5">Approved</p>
+                    <p className="text-[10px] font-semibold text-[#64748B] uppercase tracking-wider mb-0.5">{t('Approved')}</p>
                     <p className="text-xl font-bold text-[#0F172A] leading-none">{requests.filter(r => r.status === 'approved').length}</p>
                   </div>
                   <div className="bg-white p-3 rounded-[8px] border border-[#E2E8F0] border-t-[3px] border-t-emerald-500 shadow-xs flex flex-col justify-center">
-                    <p className="text-[10px] font-semibold text-[#64748B] uppercase tracking-wider mb-0.5">Completed</p>
+                    <p className="text-[10px] font-semibold text-[#64748B] uppercase tracking-wider mb-0.5">{t('Completed')}</p>
                     <p className="text-xl font-bold text-[#0F172A] leading-none">{requests.filter(r => r.status === 'completed').length}</p>
                   </div>
                   <div className="bg-white p-3 rounded-[8px] border border-[#E2E8F0] border-t-[3px] border-t-red-500 shadow-xs flex flex-col justify-center">
-                    <p className="text-[10px] font-semibold text-[#64748B] uppercase tracking-wider mb-0.5">Disapproved</p>
+                    <p className="text-[10px] font-semibold text-[#64748B] uppercase tracking-wider mb-0.5">{t('Disapproved')}</p>
                     <p className="text-xl font-bold text-[#0F172A] leading-none">{requests.filter(r => r.status === 'disapproved').length}</p>
                   </div>
                 </div>
@@ -667,7 +669,7 @@ export function AdminDashboard({ user, profile }: AdminDashboardProps) {
                               : "text-[#64748B] hover:bg-[#F8FAFC] hover:text-[#0F172A]"
                           )}
                         >
-                          {f}
+                          {f === 'all' ? t('All') : t(f)}
                         </button>
                       ))}
                     </div>
@@ -677,11 +679,11 @@ export function AdminDashboard({ user, profile }: AdminDashboardProps) {
                     <table className="w-full text-left border-collapse min-w-[600px]">
                       <thead>
                         <tr className="bg-[#F8FAFC] text-[#64748B] text-[10px] font-bold uppercase tracking-wider border-b border-[#E2E8F0]">
-                          <th className="px-4 py-3">Resident Name</th>
-                          <th className="px-4 py-3">Service Type</th>
-                          <th className="px-4 py-3">Date & Time</th>
-                          <th className="px-4 py-3 text-center">Status</th>
-                          <th className="px-4 py-3 text-center">View</th>
+                          <th className="px-4 py-3">{t('Resident Name')}</th>
+                          <th className="px-4 py-3">{t('Service Type')}</th>
+                          <th className="px-4 py-3">{t('Date & Time')}</th>
+                          <th className="px-4 py-3 text-center">{t('Status')}</th>
+                          <th className="px-4 py-3 text-center">{t('View')}</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-[#F1F5F9]">
@@ -691,15 +693,15 @@ export function AdminDashboard({ user, profile }: AdminDashboardProps) {
                               <span className="text-xs font-semibold text-[#0F172A]">{request.residentName}</span>
                             </td>
                             <td className="px-4 py-2.5">
-                              <span className="text-[11px] text-[#64748B]">{request.serviceType}</span>
+                              <span className="text-[11px] text-[#64748B]">{t(request.serviceType)}</span>
                             </td>
                             <td className="px-4 py-2.5">
                               <div className="flex flex-col">
                                 <span className="text-[11px] font-medium text-[#0F172A]">
-                                  {parseToDate(request.createdAt)?.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) || 'N/A'}
+                                  {parseToDate(request.createdAt)?.toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' }) || 'N/A'}
                                 </span>
                                 <span className="text-[10px] text-[#64748B]">
-                                  {parseToDate(request.createdAt)?.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) || ''}
+                                  {parseToDate(request.createdAt)?.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' }) || ''}
                                 </span>
                               </div>
                             </td>
@@ -711,7 +713,7 @@ export function AdminDashboard({ user, profile }: AdminDashboardProps) {
                                 request.status === 'disapproved' ? "bg-red-50 text-red-700 border border-red-100" :
                                 "bg-amber-50 text-amber-700 border border-amber-200"
                               )}>
-                                {request.status}
+                                {t(request.status)}
                               </span>
                             </td>
                             <td className="px-4 py-2.5 text-center">
@@ -725,7 +727,7 @@ export function AdminDashboard({ user, profile }: AdminDashboardProps) {
                           </tr>
                         ))}
                         {paginatedRequests.length === 0 && !loading && (
-                          <tr><td colSpan={5} className="p-8 text-center text-xs text-[#64748B]">No requests found.</td></tr>
+                          <tr><td colSpan={5} className="p-8 text-center text-xs text-[#64748B]">{t('No requests found.')}</td></tr>
                         )}
                       </tbody>
                     </table>
@@ -735,7 +737,7 @@ export function AdminDashboard({ user, profile }: AdminDashboardProps) {
                   {filteredRequests.length > 0 && (
                     <div className="p-3 border-t border-[#E2E8F0] flex items-center justify-between bg-[#F8FAFC] flex-shrink-0">
                       <span className="text-[11px] text-[#64748B] font-medium">
-                        Showing {startIndex + 1} to {Math.min(endIndex, filteredRequests.length)} of {filteredRequests.length} entries
+                        {t('Showing')} {startIndex + 1} {t('to')} {Math.min(endIndex, filteredRequests.length)} {t('of')} {filteredRequests.length} {t('entries')}
                       </span>
                       <div className="flex items-center gap-1">
                         <button
@@ -801,6 +803,7 @@ export function AdminDashboard({ user, profile }: AdminDashboardProps) {
 }
 
 function RequestDetailsModal({ request: initialRequest, onClose, user, onRequestUpdated }: { request: any, onClose: () => void, user: any, onRequestUpdated: (request: any) => void }) {
+  const { t, locale } = useLanguage();
   const [request, setRequest] = useState(initialRequest);
   const [adminNotes, setAdminNotes] = useState(request.adminNotes || '');
   const { isLoading, startLoading, stopLoading } = useLoadingActions();
@@ -822,7 +825,7 @@ function RequestDetailsModal({ request: initialRequest, onClose, user, onRequest
       return;
     }
     if (request.status !== 'pending') {
-      setErrorMessage("This request has already been processed."); setConfirmAction(null);
+      setErrorMessage(t('This request has already been processed.')); setConfirmAction(null);
       return;
     }
 
@@ -884,7 +887,7 @@ function RequestDetailsModal({ request: initialRequest, onClose, user, onRequest
           }
         } catch (emailError) {
           console.error("Email sending failed:", emailError);
-          emailWarning = " Note: Email notification could not be sent.";
+          emailWarning = ` ${t('Note: Email notification could not be sent.')}`;
         }
       }
 
@@ -893,14 +896,14 @@ function RequestDetailsModal({ request: initialRequest, onClose, user, onRequest
       onRequestUpdated(updatedRequest);
 
       if (status === 'approved') {
-         setSuccessMessage(`Request Approved Successfully.${emailWarning}`); setTimeout(() => { onClose(); }, 2000);
+         setSuccessMessage(`${t('Request Approved Successfully.')}${emailWarning}`); setTimeout(() => { onClose(); }, 2000);
       } else if (status === 'disapproved') {
-         setSuccessMessage(`Request Disapproved Successfully.${emailWarning}`); setTimeout(() => { onClose(); }, 2000);
+         setSuccessMessage(`${t('Request Disapproved Successfully.')}${emailWarning}`); setTimeout(() => { onClose(); }, 2000);
       }
       
     } catch (error) {
       console.error("Error updating request:", error);
-      setErrorMessage("Failed to update request: " + (error instanceof Error ? error.message : "Unknown error")); setConfirmAction(null);
+      setErrorMessage(`${t('Failed to update request:')} ${error instanceof Error ? error.message : t('Unknown error')}`); setConfirmAction(null);
     } finally {
       stopLoading(action);
     }
@@ -921,13 +924,13 @@ function RequestDetailsModal({ request: initialRequest, onClose, user, onRequest
       setRequest(updatedRequest);
       onRequestUpdated(updatedRequest);
       const deliveryWarning = result.emailStatus === 'failed'
-        ? ' The request is complete; completion email failed and will retry on the next document action.'
+        ? ` ${t('The request is complete; completion email failed and will retry on the next document action.')}`
         : result.notificationStatus === 'failed'
-          ? ' The request is complete; the resident notification is pending retry.'
+          ? ` ${t('The request is complete; the resident notification is pending retry.')}`
           : '';
-      setSuccessMessage(`Request completed successfully.${deliveryWarning}`);
+      setSuccessMessage(`${t('Request completed successfully.')}${deliveryWarning}`);
     } catch (error: any) {
-      setErrorMessage(error?.message || 'The request could not be marked completed.');
+      setErrorMessage(error?.message || t('The request could not be marked completed.'));
       throw error;
     } finally {
       stopLoading(loadingAction);
@@ -959,8 +962,8 @@ function RequestDetailsModal({ request: initialRequest, onClose, user, onRequest
             <>
               <div className="p-4 border-b border-[#E2E8F0] flex items-center justify-between bg-[#F8FAFC] flex-shrink-0">
                 <div>
-                  <h3 className="text-sm font-bold text-[#0F172A]">Request Details</h3>
-                  <p className="text-[11px] text-[#64748B]">Reference ID: <span className="font-mono">{request.id}</span></p>
+                  <h3 className="text-sm font-bold text-[#0F172A]">{t('Request Details')}</h3>
+                  <p className="text-[11px] text-[#64748B]">{t('Reference ID')}: <span className="font-mono">{request.id}</span></p>
                 </div>
                 <button onClick={onClose} className="p-1 hover:bg-[#E2E8F0] rounded-[6px] transition-colors text-[#64748B] hover:text-[#0F172A]">
                   <XCircle className="w-4 h-4" />
@@ -971,7 +974,7 @@ function RequestDetailsModal({ request: initialRequest, onClose, user, onRequest
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-6">
                     <div>
-                      <h3 className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider mb-2">Resident Information</h3>
+                      <h3 className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider mb-2">{t('Resident Information')}</h3>
                       <div className="flex items-center gap-3 p-3 bg-[#F8FAFC] rounded-[8px] border border-[#E2E8F0]">
                         <div className="w-10 h-10 bg-[#EFF6FF] text-[#2563EB] rounded-full flex items-center justify-center font-bold text-sm border border-blue-100 flex-shrink-0">
                           {request.residentName?.charAt(0)}
@@ -984,11 +987,11 @@ function RequestDetailsModal({ request: initialRequest, onClose, user, onRequest
                     </div>
 
                     <div>
-                      <h3 className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider mb-2">Service Details</h3>
+                      <h3 className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider mb-2">{t('Service Details')}</h3>
                       <div className="bg-[#F8FAFC] p-3 rounded-[8px] border border-[#E2E8F0]">
-                        <p className="text-xs font-bold text-[#0F172A] mb-1.5">{request.serviceType}</p>
+                        <p className="text-xs font-bold text-[#0F172A] mb-1.5">{t(request.serviceType)}</p>
                         <p className="text-[11px] text-[#0F172A] leading-relaxed whitespace-pre-wrap">
-                          {request.description || <span className="text-[#64748B] italic">No description provided.</span>}
+                          {request.description || <span className="text-[#64748B] italic">{t('No description provided.')}</span>}
                         </p>
                       </div>
                     </div>
@@ -996,35 +999,35 @@ function RequestDetailsModal({ request: initialRequest, onClose, user, onRequest
 
                   <div className="space-y-6">
                     <div>
-                      <h3 className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider mb-2">Timeline & Status</h3>
+                      <h3 className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider mb-2">{t('Timeline & Status')}</h3>
                       <div className="bg-[#F8FAFC] p-4 rounded-[8px] border border-[#E2E8F0] space-y-4">
                         <div className="flex items-center justify-between gap-2">
                           <span className="text-[11px] font-medium text-[#64748B] flex items-center gap-1.5">
-                            <Clock className="w-3.5 h-3.5" /> Submitted
+                            <Clock className="w-3.5 h-3.5" /> {t('Submitted')}
                           </span>
-                          <span className="text-xs font-semibold text-[#0F172A]">{formatDate(request.createdAt)}</span>
+                          <span className="text-xs font-semibold text-[#0F172A]">{formatDate(request.createdAt, locale)}</span>
                         </div>
                         
                         {request.updatedAt && (
                           <div className="flex items-center justify-between gap-2 border-t border-[#E2E8F0] pt-3">
                             <span className="text-[11px] font-medium text-[#64748B] flex items-center gap-1.5">
-                              <Calendar className="w-3.5 h-3.5" /> Updated
+                              <Calendar className="w-3.5 h-3.5" /> {t('Updated')}
                             </span>
-                            <span className="text-xs font-semibold text-[#0F172A]">{formatDate(request.updatedAt)}</span>
+                            <span className="text-xs font-semibold text-[#0F172A]">{formatDate(request.updatedAt, locale)}</span>
                           </div>
                         )}
 
                         {request.appointmentDate && (
                           <div className="flex items-center justify-between gap-2 border-t border-[#E2E8F0] pt-3">
                             <span className="text-[11px] font-medium text-[#64748B] flex items-center gap-1.5">
-                              <Calendar className="w-3.5 h-3.5" /> Appointment
+                              <Calendar className="w-3.5 h-3.5" /> {t('Appointment')}
                             </span>
-                            <span className="text-xs font-semibold text-[#0F172A]">{new Date(request.appointmentDate).toLocaleDateString()} {request.appointmentTime && `at ${request.appointmentTime}`}</span>
+                            <span className="text-xs font-semibold text-[#0F172A]">{new Date(request.appointmentDate).toLocaleDateString(locale)} {request.appointmentTime && `${t('at')} ${request.appointmentTime}`}</span>
                           </div>
                         )}
 
                         <div className="flex items-center justify-between gap-2 border-t border-[#E2E8F0] pt-3">
-                          <span className="text-[11px] font-medium text-[#64748B]">Current Status</span>
+                          <span className="text-[11px] font-medium text-[#64748B]">{t('Current Status')}</span>
                           <span className={cn(
                             "px-2 py-0.5 rounded-[4px] text-[10px] font-bold uppercase tracking-wider",
                             request.status === 'completed' ? "bg-emerald-50 text-emerald-700 border border-emerald-200" :
@@ -1032,35 +1035,35 @@ function RequestDetailsModal({ request: initialRequest, onClose, user, onRequest
                             request.status === 'disapproved' ? "bg-red-50 text-red-700 border border-red-200" :
                             "bg-amber-50 text-amber-700 border border-amber-200"
                           )}>
-                            {request.status}
+                            {t(request.status)}
                           </span>
                         </div>
                         {request.status === 'completed' && (
                           <div className="border-t border-[#E2E8F0] pt-3 space-y-2">
                             <div className="flex items-center justify-between gap-2">
-                              <span className="text-[11px] font-medium text-[#64748B]">Completed</span>
+                              <span className="text-[11px] font-medium text-[#64748B]">{t('Completed')}</span>
                               <span className="text-xs font-semibold text-[#0F172A]">
-                                {request.completedAt ? new Date(request.completedAt).toLocaleString('en-US', { dateStyle: 'long', timeStyle: 'short' }) : 'Recorded'}
+                                {request.completedAt ? new Date(request.completedAt).toLocaleString(locale, { dateStyle: 'long', timeStyle: 'short' }) : t('Recorded')}
                               </span>
                             </div>
                             <div className="flex items-center justify-between gap-2">
-                              <span className="text-[11px] font-medium text-[#64748B]">Completed By</span>
+                              <span className="text-[11px] font-medium text-[#64748B]">{t('Completed By')}</span>
                               <span className="text-xs font-semibold text-[#0F172A]">{request.completedBy || 'Administrator'}</span>
                             </div>
                             {request.completionAction && (
                               <div className="flex items-center justify-between gap-2">
-                                <span className="text-[11px] font-medium text-[#64748B]">Completion Action</span>
+                                <span className="text-[11px] font-medium text-[#64748B]">{t('Completion Action')}</span>
                                 <span className="text-xs font-semibold text-[#0F172A]">{request.completionAction}</span>
                               </div>
                             )}
                             {request.completionEmailStatus === 'failed' && (
                               <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded p-2">
-                                Completion email failed and will retry on the next print or download.
+                                {t('Completion email failed and will retry on the next print or download.')}
                               </p>
                             )}
                             {request.completionNotificationStatus === 'failed' && (
                               <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded p-2">
-                                Resident notification is pending retry.
+                                {t('Resident notification is pending retry.')}
                               </p>
                             )}
                           </div>
@@ -1069,12 +1072,12 @@ function RequestDetailsModal({ request: initialRequest, onClose, user, onRequest
                     </div>
 
                     <div className="flex-1 flex flex-col min-h-[140px]">
-                      <h3 className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider mb-2">Admin Notes (Optional)</h3>
+                      <h3 className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider mb-2">{t('Admin Notes (Optional)')}</h3>
                       <textarea
                         value={adminNotes}
                         onChange={(e) => setAdminNotes(e.target.value)}
                         disabled={request.status === 'completed' || request.status === 'disapproved'}
-                        placeholder="Internal notes or instructions for the resident..."
+                        placeholder={t('Internal notes or instructions for the resident...')}
                         className="w-full flex-1 bg-white border border-[#E2E8F0] rounded-[8px] p-3 text-xs focus:border-[#2563EB] focus:ring-1 focus:ring-[#2563EB] transition-all resize-none outline-none shadow-sm disabled:opacity-75 disabled:bg-gray-50"
                       />
                     </div>
@@ -1087,8 +1090,8 @@ function RequestDetailsModal({ request: initialRequest, onClose, user, onRequest
   {successMessage && <div className="text-green-600 text-xs mb-3 text-right bg-green-50 p-2 rounded">{successMessage}</div>}
   {confirmAction && !isLoading(`update-request-status:${request.id}:${confirmAction}`) && !successMessage && (
     <div className="text-amber-700 text-xs mb-3 text-right bg-amber-50 p-2 rounded flex justify-between items-center">
-      <span>Are you sure you want to <b>{confirmAction}</b> this request?</span>
-      <button onClick={() => setConfirmAction(null)} className="underline text-gray-500 hover:text-gray-700">Cancel</button>
+      <span>{t('Are you sure you want to')} <b>{t(confirmAction)}</b> {t('this request?')}</span>
+      <button onClick={() => setConfirmAction(null)} className="underline text-gray-500 hover:text-gray-700">{t('Cancel')}</button>
     </div>
   )}
   <div className="flex flex-col sm:flex-row items-center justify-end gap-2 w-full">
@@ -1098,7 +1101,7 @@ function RequestDetailsModal({ request: initialRequest, onClose, user, onRequest
                       onClick={onClose}
                       className="w-full sm:w-auto px-4 py-2 bg-white border border-[#E2E8F0] text-[#0F172A] text-xs font-semibold rounded-[6px] hover:bg-[#F1F5F9] transition-colors shadow-sm"
                     >
-                      Cancel
+                      {t('Cancel')}
                     </button>
                     <button
                       disabled={isLoading(`update-request-status:${request.id}:approved`) || isLoading(`update-request-status:${request.id}:disapproved`)}
@@ -1106,7 +1109,7 @@ function RequestDetailsModal({ request: initialRequest, onClose, user, onRequest
                       className="w-full sm:w-auto px-4 py-2 bg-white border border-red-200 text-red-600 hover:bg-red-50 text-xs font-semibold rounded-[6px] transition-colors shadow-sm flex items-center justify-center gap-1.5 disabled:opacity-50"
                     >
                       {isLoading(`update-request-status:${request.id}:disapproved`) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <XCircle className="w-3.5 h-3.5" />}
-                      {isLoading(`update-request-status:${request.id}:disapproved`) ? "Processing..." : "Disapprove Request"}
+                      {isLoading(`update-request-status:${request.id}:disapproved`) ? t('Processing...') : t('Disapprove Request')}
                     </button>
                     <button
                       disabled={isLoading(`update-request-status:${request.id}:approved`) || isLoading(`update-request-status:${request.id}:disapproved`)}
@@ -1114,7 +1117,7 @@ function RequestDetailsModal({ request: initialRequest, onClose, user, onRequest
                       className="w-full sm:w-auto px-4 py-2 bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-xs font-semibold rounded-[6px] transition-colors shadow-sm flex items-center justify-center gap-1.5 disabled:opacity-50"
                     >
                       {isLoading(`update-request-status:${request.id}:approved`) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
-                      {isLoading(`update-request-status:${request.id}:approved`) ? "Processing..." : "Approve Request"}
+                      {isLoading(`update-request-status:${request.id}:approved`) ? t('Processing...') : t('Approve Request')}
                     </button>
                   </>
                 )}
@@ -1125,21 +1128,21 @@ function RequestDetailsModal({ request: initialRequest, onClose, user, onRequest
                       onClick={onClose}
                       className="w-full sm:w-auto px-4 py-2 bg-white border border-[#E2E8F0] text-[#0F172A] text-xs font-semibold rounded-[6px] hover:bg-[#F1F5F9] transition-colors shadow-sm"
                     >
-                      Close
+                      {t('Close')}
                     </button>
                     <button
                       onClick={() => openDocumentAction('PRINT')}
                       className="w-full sm:w-auto px-4 py-2 bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-xs font-semibold rounded-[6px] transition-colors shadow-sm flex items-center justify-center gap-1.5"
                     >
                       <Printer className="w-3.5 h-3.5" />
-                      {request.serviceType?.toLowerCase().includes('certificate') || request.serviceType?.toLowerCase().includes('clearance') ? 'Print Certificate' : 'Print Document'}
+                      {request.serviceType?.toLowerCase().includes('certificate') || request.serviceType?.toLowerCase().includes('clearance') ? t('Print Certificate') : t('Print Document')}
                     </button>
                     <button
                       onClick={() => openDocumentAction('DOWNLOAD')}
                       className="w-full sm:w-auto px-4 py-2 bg-white border border-[#E2E8F0] text-[#0F172A] text-xs font-semibold rounded-[6px] hover:bg-[#F1F5F9] transition-colors shadow-sm flex items-center justify-center gap-1.5"
                     >
                       <FileText className="w-3.5 h-3.5" />
-                      Download PDF
+                      {t('Download PDF')}
                     </button>
                   </>
                 )}
@@ -1150,21 +1153,21 @@ function RequestDetailsModal({ request: initialRequest, onClose, user, onRequest
                       onClick={onClose}
                       className="w-full sm:w-auto px-4 py-2 bg-white border border-[#E2E8F0] text-[#0F172A] text-xs font-semibold rounded-[6px] hover:bg-[#F1F5F9] transition-colors shadow-sm"
                     >
-                      Close
+                      {t('Close')}
                     </button>
                     <button
                       onClick={() => openDocumentAction('PRINT')}
                       className="w-full sm:w-auto px-4 py-2 bg-[#F8FAFC] border border-[#E2E8F0] text-[#0F172A] hover:bg-[#E2E8F0] text-xs font-semibold rounded-[6px] transition-colors shadow-sm flex items-center justify-center gap-1.5"
                     >
                       <Printer className="w-3.5 h-3.5" />
-                      Reprint
+                      {t('Reprint')}
                     </button>
                     <button
                       onClick={() => openDocumentAction('DOWNLOAD')}
                       className="w-full sm:w-auto px-4 py-2 bg-white border border-[#E2E8F0] text-[#0F172A] text-xs font-semibold rounded-[6px] hover:bg-[#F1F5F9] transition-colors shadow-sm flex items-center justify-center gap-1.5"
                     >
                       <FileText className="w-3.5 h-3.5" />
-                      Download PDF
+                      {t('Download PDF')}
                     </button>
                   </>
                 )}
@@ -1174,7 +1177,7 @@ function RequestDetailsModal({ request: initialRequest, onClose, user, onRequest
                     onClick={onClose}
                     className="w-full sm:w-auto px-4 py-2 bg-white border border-[#E2E8F0] text-[#0F172A] text-xs font-semibold rounded-[6px] hover:bg-[#F1F5F9] transition-colors shadow-sm"
                   >
-                    Close
+                    {t('Close')}
                   </button>
                 )}
               </div>
@@ -1187,10 +1190,11 @@ function RequestDetailsModal({ request: initialRequest, onClose, user, onRequest
 }
 
 function AnnouncementList() {
+  const { t, locale } = useLanguage();
   const { announcements } = useSchedule();
   
   if (announcements.length === 0) {
-    return <p className="text-[11px] text-[#64748B] italic text-center py-6">No announcements currently available.</p>;
+    return <p className="text-[11px] text-[#64748B] italic text-center py-6">{t('No announcements currently available.')}</p>;
   }
 
   return (
@@ -1198,9 +1202,9 @@ function AnnouncementList() {
       {announcements.slice(0, 3).map((ann) => (
         <div key={ann.id} className="p-3 bg-[#F8FAFC] rounded-[8px] border border-[#E2E8F0]">
           <div className="flex items-start justify-between gap-2 mb-1">
-            <h4 className="text-xs font-bold text-[#0F172A] line-clamp-1">{ann.title || 'Barangay Announcement'}</h4>
+            <h4 className="text-xs font-bold text-[#0F172A] line-clamp-1">{ann.title || t('Barangay Announcement')}</h4>
             <span className="text-[9px] text-[#64748B] whitespace-nowrap">
-              {parseToDate(ann.createdAt)?.toLocaleDateString() || 'Just now'}
+              {parseToDate(ann.createdAt)?.toLocaleDateString(locale) || t('Just now')}
             </span>
           </div>
           <p className="text-[11px] text-[#64748B] leading-relaxed line-clamp-2">{ann.message}</p>

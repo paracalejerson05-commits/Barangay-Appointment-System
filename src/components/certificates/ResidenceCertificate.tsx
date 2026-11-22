@@ -1,5 +1,6 @@
 import React from 'react';
 import { InlineInput } from './InlineInput';
+import { PunongBarangaySignature } from './PunongBarangaySignature';
 
 export function ResidenceCertificate({ certData, updateField, isDownloading }: { certData: any, updateField: any, isDownloading: boolean }) {
   return (
@@ -89,13 +90,13 @@ export function ResidenceCertificate({ certData, updateField, isDownloading }: {
         </div>
 
         {/* Signature Area */}
-        <div className="mt-8 flex flex-col items-start w-full relative pl-2">
-          <p className="mb-10">Certified by:</p>
+        <div className="mt-4 mb-[12mm] flex flex-col items-start w-full relative pl-2">
+          <p className="mb-6">Certified by:</p>
           
-          <div className="text-left relative z-10">
-            <div className="w-full border-b-[1.5px] border-black mb-1"></div>
-            <div className="font-bold text-[18px] uppercase text-left w-auto min-w-[250px] px-0">HON. ELPIDIO D. DIOCTON</div>
-            <p className="text-[17px] text-left">Punong Barangay</p>
+          <div className="relative z-10 flex flex-col items-center text-center">
+            <PunongBarangaySignature signatoryName="HON. ELPIDIO D. DIOCTON" />
+            <div className="font-bold text-[18px] uppercase min-w-[250px] px-0">HON. ELPIDIO D. DIOCTON</div>
+            <p className="text-[17px]">Punong Barangay</p>
           </div>
           
           {/* Seal Area */}

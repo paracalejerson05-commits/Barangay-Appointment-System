@@ -1,5 +1,6 @@
 import React from 'react';
 import { InlineInput } from './InlineInput';
+import { PunongBarangaySignature } from './PunongBarangaySignature';
 
 export function IndigencyCertificate({ certData, updateField, isDownloading }: { certData: any, updateField: any, isDownloading: boolean }) {
   return (
@@ -91,7 +92,7 @@ export function IndigencyCertificate({ certData, updateField, isDownloading }: {
         </div>
 
         {/* Signatures */}
-        <div className="mt-12 flex justify-between w-full px-4 relative">
+        <div className="mt-12 mb-[8mm] flex justify-between w-full px-4 relative">
           <div className="flex flex-col items-start w-1/2">
             <p className="italic mb-12">Prepared by:</p>
             
@@ -104,12 +105,12 @@ export function IndigencyCertificate({ certData, updateField, isDownloading }: {
             <p className="italic text-[19px] font-serif mt-12">Barangay seal.</p>
           </div>
 
-          <div className="flex flex-col items-center w-1/2 mt-20">
+          <div className="relative -top-[14mm] flex flex-col items-center w-1/2 mt-20">
             <p className="mb-12 self-start pl-8">Certified by:</p>
             
-            <div className="text-center w-full pl-8">
-              <div className="w-full border-b-[1.5px] border-black mb-1"></div>
-              <div className="font-bold text-[18px] uppercase">HON. ELPIDIO D. DIOCTON</div>
+            <div className="text-center w-full">
+              <PunongBarangaySignature signatoryName="HON. ELPIDIO D. DIOCTON" />
+              <div className="whitespace-nowrap font-bold text-[18px] uppercase">HON. ELPIDIO D. DIOCTON</div>
               <p className="text-[17px] italic">Punong Barangay</p>
             </div>
           </div>

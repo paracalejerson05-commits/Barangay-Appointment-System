@@ -27,10 +27,10 @@ export function parseToDate(val: any): Date | null {
   return null;
 }
 
-export function formatDate(date: any) {
+export function formatDate(date: any, locale = 'en-PH') {
   const d = parseToDate(date);
   if (!d) return 'N/A';
-  return d.toLocaleDateString('en-PH', {
+  return d.toLocaleDateString(locale, {
     year: 'numeric',
     month: 'long',
     day: 'numeric',

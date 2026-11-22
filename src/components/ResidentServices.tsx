@@ -25,6 +25,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { formatUnavailableSlotMessage, getRequestReference } from '../lib/requestPresentation';
 import { getAppointmentDateKey, type AvailableAppointmentSlot } from '../lib/appointmentAvailability';
+import { useLanguage } from '../context/LanguageContext';
 
 interface ResidentServicesProps {
   user: any;
@@ -33,6 +34,7 @@ interface ResidentServicesProps {
 
 export function ResidentServices({ user, profile }: ResidentServicesProps) {
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const profileStatus = checkProfileCompletion(profile, user?.email);
   const [showIncompleteModal, setShowIncompleteModal] = useState(false);
   const [step, setStep] = useState(1);
@@ -233,7 +235,7 @@ export function ResidentServices({ user, profile }: ResidentServicesProps) {
           Services
         </h2>
         <p className="text-xs sm:text-sm text-[#64748B] mt-1 font-medium">
-          Select the document or service you need and provide your details.
+          {t('Select the document or service you need and provide your details.')}
         </p>
       </div>
 
@@ -246,10 +248,10 @@ export function ResidentServices({ user, profile }: ResidentServicesProps) {
             </div>
             <div>
               <h4 className="text-xs sm:text-sm font-bold text-amber-900">
-                Complete your profile to request services
+                {t('Complete your profile to request services')}
               </h4>
               <p className="text-[11px] sm:text-xs text-amber-700 font-normal">
-                You can browse services, but you must complete your profile before submitting a request.
+                {t('You can browse services, but you must complete your profile before submitting a request.')}
               </p>
             </div>
           </div>
@@ -258,7 +260,7 @@ export function ResidentServices({ user, profile }: ResidentServicesProps) {
             onClick={() => navigate('/settings')}
             className="w-full sm:w-auto h-10 sm:h-9 px-4 bg-amber-600 hover:bg-amber-700 text-white rounded-[8px] font-semibold text-xs transition-colors shadow-2xs flex items-center justify-center gap-1.5 cursor-pointer flex-shrink-0"
           >
-            <span>Complete Profile</span>
+            <span>{t('Complete Profile')}</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -274,8 +276,8 @@ export function ResidentServices({ user, profile }: ResidentServicesProps) {
           >
             <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0" />
             <div>
-              <p className="font-semibold">Request submitted successfully.</p>
-              <p className="text-xs font-normal mt-0.5">Reference: <span className="font-mono font-semibold">{submittedRequest?.referenceNumber || getRequestReference(submittedRequest?.id, submittedRequest?.createdAt)}</span>. Track it in “My Requests”.</p>
+              <p className="font-semibold">{t('Request submitted successfully.')}</p>
+              <p className="text-xs font-normal mt-0.5">{t('Reference:')} <span className="font-mono font-semibold">{submittedRequest?.referenceNumber || getRequestReference(submittedRequest?.id, submittedRequest?.createdAt)}</span>. {t('Track it in “My Requests”.')}</p>
             </div>
           </motion.div>
         )}
@@ -299,7 +301,7 @@ export function ResidentServices({ user, profile }: ResidentServicesProps) {
           )}>
             1
           </span>
-          <span>Select Service</span>
+          <span>{t('Select Service')}</span>
         </button>
 
         <ArrowRight className="w-4 h-4 text-[#94A3B8]" />
@@ -318,7 +320,7 @@ export function ResidentServices({ user, profile }: ResidentServicesProps) {
           )}>
             2
           </span>
-          <span>Fill Details</span>
+          <span>{t('Fill Details')}</span>
         </div>
       </div>
 
@@ -337,12 +339,12 @@ export function ResidentServices({ user, profile }: ResidentServicesProps) {
               {/* Header inside Available Services */}
               <div className="flex items-center justify-between mb-4 pb-3 border-b border-[#F1F5F9]">
                 <div>
-                  <h3 className="text-base font-bold text-[#0F172A]">Available Services</h3>
-                  <p className="text-xs text-[#64748B]">Select a service to continue</p>
+                  <h3 className="text-base font-bold text-[#0F172A]">{t('Available Services')}</h3>
+                  <p className="text-xs text-[#64748B]">{t('Select a service to continue')}</p>
                 </div>
                 {serviceType && (
                   <span className="text-xs font-semibold text-[#2563EB] bg-blue-50 px-2.5 py-1 rounded-[6px] border border-blue-100">
-                    Selected: {serviceType}
+                    {t('Selected:')} {t(serviceType)}
                   </span>
                 )}
               </div>
@@ -381,10 +383,10 @@ export function ResidentServices({ user, profile }: ResidentServicesProps) {
                           "font-bold text-[13px] sm:text-sm leading-snug line-clamp-2 sm:line-clamp-1 mb-0.5 sm:mb-1 transition-colors",
                           isSelected ? "text-[#2563EB]" : "text-[#0F172A] group-hover:text-[#2563EB]"
                         )}>
-                          {service.name}
+                          {t(service.name)}
                         </h4>
                         <p className="text-[11px] text-[#64748B] leading-snug line-clamp-1 sm:line-clamp-2">
-                          {service.description}
+                          {t(service.description)}
                         </p>
                       </div>
                     </button>
@@ -423,8 +425,8 @@ export function ResidentServices({ user, profile }: ResidentServicesProps) {
                       {services.find(s => s.name === serviceType)?.icon && React.createElement(services.find(s => s.name === serviceType)!.icon, { className: "w-5 h-5" })}
                     </div>
                     <div>
-                      <h3 className="text-base font-bold text-[#0F172A]">{serviceType}</h3>
-                      <p className="text-xs text-[#64748B]">Please provide the required appointment information.</p>
+                      <h3 className="text-base font-bold text-[#0F172A]">{t(serviceType)}</h3>
+                      <p className="text-xs text-[#64748B]">{t('Please provide the required appointment information.')}</p>
                     </div>
                   </div>
                   <button
@@ -443,8 +445,8 @@ export function ResidentServices({ user, profile }: ResidentServicesProps) {
                     <div className="flex items-start gap-2.5">
                       <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
                       <div>
-                        <p className="text-xs font-bold text-amber-900">Profile Incomplete</p>
-                        <p className="text-[11px] text-amber-700">Complete your profile before submitting.</p>
+                        <p className="text-xs font-bold text-amber-900">{t('Profile Incomplete')}</p>
+                        <p className="text-[11px] text-amber-700">{t('Complete your profile before submitting.')}</p>
                       </div>
                     </div>
                     <button
@@ -452,7 +454,7 @@ export function ResidentServices({ user, profile }: ResidentServicesProps) {
                       onClick={() => navigate('/settings')}
                       className="w-full sm:w-auto h-9 px-3.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold rounded-[8px] flex items-center justify-center gap-1.5 transition-colors cursor-pointer flex-shrink-0"
                     >
-                      <span>Complete Profile</span>
+                      <span>{t('Complete Profile')}</span>
                       <ArrowRight className="w-3.5 h-3.5" />
                     </button>
                   </div>
@@ -462,7 +464,7 @@ export function ResidentServices({ user, profile }: ResidentServicesProps) {
                   {/* Row 1: Full Name & Age */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-semibold text-[#0F172A] mb-1.5">Full Name</label>
+                      <label className="block text-xs font-semibold text-[#0F172A] mb-1.5">{t('Full Name')}</label>
                       <input
                         type="text"
                         required
@@ -472,7 +474,7 @@ export function ResidentServices({ user, profile }: ResidentServicesProps) {
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-[#0F172A] mb-1.5">Age</label>
+                      <label className="block text-xs font-semibold text-[#0F172A] mb-1.5">{t('Age')}</label>
                       <input
                         type="number"
                         required
@@ -486,28 +488,28 @@ export function ResidentServices({ user, profile }: ResidentServicesProps) {
                   {/* Row 2: Gender & Civil Status */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-semibold text-[#0F172A] mb-1.5">Gender</label>
+                      <label className="block text-xs font-semibold text-[#0F172A] mb-1.5">{t('Gender')}</label>
                       <select
                         value={formData.gender}
                         onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
                         className="w-full bg-white border border-[#E2E8F0] rounded-[10px] px-3.5 py-2 text-xs text-[#0F172A] focus:border-[#2563EB] focus:outline-none transition-colors"
                       >
-                        <option>Male</option>
-                        <option>Female</option>
-                        <option>Other</option>
+                        <option value="Male">{t('Male')}</option>
+                        <option value="Female">{t('Female')}</option>
+                        <option value="Other">{t('Other')}</option>
                       </select>
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-[#0F172A] mb-1.5">Civil Status</label>
+                      <label className="block text-xs font-semibold text-[#0F172A] mb-1.5">{t('Civil Status')}</label>
                       <select
                         value={formData.civilStatus}
                         onChange={(e) => setFormData({ ...formData, civilStatus: e.target.value })}
                         className="w-full bg-white border border-[#E2E8F0] rounded-[10px] px-3.5 py-2 text-xs text-[#0F172A] focus:border-[#2563EB] focus:outline-none transition-colors"
                       >
-                        <option>Single</option>
-                        <option>Married</option>
-                        <option>Widowed</option>
-                        <option>Separated</option>
+                        <option value="Single">{t('Single')}</option>
+                        <option value="Married">{t('Married')}</option>
+                        <option value="Widowed">{t('Widowed')}</option>
+                        <option value="Separated">{t('Separated')}</option>
                       </select>
                     </div>
                   </div>
@@ -515,7 +517,7 @@ export function ResidentServices({ user, profile }: ResidentServicesProps) {
                   {/* Row 3: Appointment Date & Time */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-semibold text-[#0F172A] mb-1.5">Appointment Date</label>
+                      <label className="block text-xs font-semibold text-[#0F172A] mb-1.5">{t('Appointment Date')}</label>
                       <input
                         type="date"
                         required
@@ -532,7 +534,7 @@ export function ResidentServices({ user, profile }: ResidentServicesProps) {
                       )}
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-[#0F172A] mb-1.5">Preferred Time Slot</label>
+                      <label className="block text-xs font-semibold text-[#0F172A] mb-1.5">{t('Preferred Time Slot')}</label>
                       <div className="relative">
                         <select
                           required
@@ -561,7 +563,7 @@ export function ResidentServices({ user, profile }: ResidentServicesProps) {
                           <Sparkles className="w-3.5 h-3.5" />
                         </div>
                         <div>
-                          <p className="text-[10px] font-bold text-[#2563EB] uppercase tracking-wide">AI Recommendation</p>
+                          <p className="text-[10px] font-bold text-[#2563EB] uppercase tracking-wide">{t('AI Recommendation')}</p>
                           <p className="text-xs text-[#1E293B] font-medium">{recommendation.display} • {recommendation.estimatedWait || 'Estimated wait unavailable'} • {recommendation.queueLevel || 'Available queue'}</p>
                           <p className="text-[10px] text-[#64748B] mt-0.5">{recommendation.reason || 'Selected from administrator-defined availability.'}</p>
                         </div>
@@ -580,18 +582,18 @@ export function ResidentServices({ user, profile }: ResidentServicesProps) {
                     </div>
                   ) : isCalculating ? (
                     <div className="text-xs text-[#64748B] flex items-center gap-2">
-                      <Loader2 className="w-3.5 h-3.5 animate-spin text-[#2563EB]" /> Calculating the best available slot...
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-[#2563EB]" /> {t('Calculating the best available slot...')}
                     </div>
                   ) : null}
 
                   {/* Purpose */}
                   <div>
-                    <label className="block text-xs font-semibold text-[#0F172A] mb-1.5">Purpose of Request</label>
+                    <label className="block text-xs font-semibold text-[#0F172A] mb-1.5">{t('Purpose of Request')}</label>
                     <textarea
                       required
                       value={formData.purpose}
                       onChange={(e) => setFormData({ ...formData, purpose: e.target.value })}
-                      placeholder="e.g., For scholarship application, local employment requirement, or business permit..."
+                      placeholder={t('e.g., For scholarship application, local employment requirement, or business permit...')}
                       className="w-full bg-white border border-[#E2E8F0] rounded-[10px] p-3 text-xs text-[#0F172A] placeholder:text-[#94A3B8] focus:border-[#2563EB] focus:outline-none transition-colors h-24 resize-none"
                     />
                   </div>
@@ -600,7 +602,7 @@ export function ResidentServices({ user, profile }: ResidentServicesProps) {
                   <div className="bg-[#F8FAFC] p-3 rounded-[10px] flex items-start gap-2.5 border border-[#E2E8F0]">
                     <Sparkles className="w-4 h-4 text-[#2563EB] flex-shrink-0 mt-0.5" />
                     <p className="text-[11px] text-[#64748B] leading-relaxed">
-                      <strong className="text-[#0F172A]">AI Smart Tip:</strong> {serviceType} requests submitted with complete details before 10:00 AM are usually processed within the same business day.
+                      <strong className="text-[#0F172A]">{t('AI Smart Tip:')}</strong> {t(serviceType)} {t('requests submitted with complete details before 10:00 AM are usually processed within the same business day.')}
                     </p>
                   </div>
                 </div>
@@ -622,11 +624,11 @@ export function ResidentServices({ user, profile }: ResidentServicesProps) {
                     {isSubmitting ? (
                       <>
                         <Loader2 className="w-4 h-4 animate-spin" />
-                        <span>Submitting Request...</span>
+                        <span>{t('Submitting Request...')}</span>
                       </>
                     ) : (
                       <>
-                        <span>Submit Service Request</span>
+                        <span>{t('Submit Service Request')}</span>
                         <CheckCircle2 className="w-4 h-4" />
                       </>
                     )}
